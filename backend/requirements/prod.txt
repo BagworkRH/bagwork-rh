@@ -1,0 +1,4 @@
+-r base.txt
+
+# Production extras (monitoring etc. added in Phase 8)
+# sentry-sdk>=2.0

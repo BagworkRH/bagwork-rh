@@ -1,0 +1,4 @@
+-r base.txt
+
+# Local dev niceties
+ruff>=0.6
