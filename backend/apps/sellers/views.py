@@ -21,12 +21,18 @@ def me(request):
     return Response(UserSerializer(request.user).data)
 
 
-@api_view(["GET", "PATCH"])
+@api_view(["GET", "POST", "PATCH"])
 @permission_classes([IsAuthenticated])
 def seller_profile(request):
     profile, created = SellerProfile.objects.get_or_create(user=request.user)
     if request.method == "GET":
         return Response(SellerProfileSerializer(profile).data)
+    if request.method == "POST":
+        # Idempotent onboard: update profile if it exists, create otherwise.
+        serializer = SellerProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
     serializer = SellerProfileSerializer(profile, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     serializer.save()

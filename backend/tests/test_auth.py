@@ -70,6 +70,29 @@ class AuthApiTests(TestCase):
         me = self.client.get("/api/v1/me/")
         self.assertEqual(me.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_seller_profile_created_via_post(self):
+        # A bare user WITHOUT a seller profile: POST creates one (201).
+        user = User.objects.create_user(
+            username="bare", email="bare@example.com", password="Testpass123!"
+        )
+        self.client.force_authenticate(user=user)
+        resp = self.client.post(
+            "/api/v1/me/seller/",
+            {"display_name": "Demo Seller"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertRegex(resp.data["seller_code"], r"^SELLER-")
+        self.assertEqual(resp.data["display_name"], "Demo Seller")
+
+    def test_seller_profile_post_is_idempotent(self):
+        user, _ = make_user()
+        self.client.force_authenticate(user=user)
+        r1 = self.client.post("/api/v1/me/seller/", {"display_name": "A"}, format="json")
+        r2 = self.client.post("/api/v1/me/seller/", {"display_name": "A"}, format="json")
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+        self.assertEqual(r1.data["seller_code"], r2.data["seller_code"])
+
     def test_health_endpoint(self):
         resp = self.client.get("/api/health/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
