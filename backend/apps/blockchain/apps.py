@@ -1,4 +1,4 @@
-"""Blockchain app placeholder (filled in Phase 6: claims, listeners, ledger)."""
+"""Blockchain app (Phase 6): claims signing, listener, ledger, reconciliation."""
 from django.apps import AppConfig
 
 

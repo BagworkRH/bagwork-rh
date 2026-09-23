@@ -1,58 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ConnectWalletButton from "@/components/ConnectWalletButton";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/api";
+import { useClaimFlow } from "@/hooks/useClaimFlow";
+import { useWallet } from "@/hooks/useWallet";
 import { shortenAddress } from "@/lib/constants";
+import { listClaims, listRewards, listWallets } from "@/services/wallet";
 import type { Claim, Reward, Wallet } from "@/types";
 
 export default function WalletPage() {
   const { user } = useAuth();
+  const { sendTransaction } = useWallet();
+  const { step, claimReward, reset } = useClaimFlow();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
-  const [claims, setClaims] = useState<Omit<Claim, "chain_id">[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [claims, setClaims] = useState<Claim[]>([]);
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!user) return;
-    apiRequest<Wallet[]>("/api/v1/me/wallets/", { auth: true })
-      .then(setWallets)
-      .catch(() => setWallets([]));
-    apiRequest<Reward[]>("/api/v1/rewards/", { auth: true })
-      .then(setRewards)
-      .catch(() => setRewards([]));
-    apiRequest<Omit<Claim, "chain_id">[]>("/api/v1/me/claims/", { auth: true })
-      .then(setClaims)
-      .catch(() => setClaims([]));
+    try {
+      const [nextWallets, nextRewards, nextClaims] = await Promise.all([
+        listWallets(),
+        listRewards(),
+        listClaims(),
+      ]);
+      setWallets(nextWallets);
+      setRewards(nextRewards);
+      setClaims(nextClaims);
+    } catch {
+      // A failed refresh must not break the page; state stays as it was.
+    }
   }, [user]);
 
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const available = rewards.filter((r) => r.status === "AVAILABLE");
+  const verifiedWallet = wallets.find((w) => w.verified);
 
   async function handleClaim(reward: Reward) {
-    const wallet = wallets.find((w) => w.verified);
-    if (!wallet) {
-      setMessage("Connect and verify a wallet before claiming.");
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    try {
-      const claim = await apiRequest<Claim>("/api/v1/claims/", {
-        method: "POST",
-        body: { reward_id: reward.id, wallet_id: wallet.id },
-        auth: true,
-      });
-      setMessage(
-        `Claim created (${claim.status}) for ${claim.amount} ${claim.token_symbol}. Submit the transaction from your wallet.`
-      );
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Claim failed.");
-    } finally {
-      setBusy(false);
-    }
+    if (!verifiedWallet) return; // guarded by the disabled button below
+    reset();
+    const claim = await claimReward(reward, verifiedWallet, sendTransaction);
+    if (claim) await refresh();
   }
+
+  const busy =
+    step.phase === "creating" ||
+    step.phase === "authorizing" ||
+    step.phase === "awaiting-wallet" ||
+    step.phase === "recording";
 
   return (
     <div className="container section" style={{ maxWidth: 820 }}>
@@ -64,7 +63,7 @@ export default function WalletPage() {
       ) : (
         <div className="grid">
           <div>
-            <ConnectWalletButton />
+            <ConnectWalletButton onVerified={() => void refresh()} />
 
             <div className="card" style={{ marginTop: 20 }}>
               <h3>Connected wallets</h3>
@@ -101,13 +100,22 @@ export default function WalletPage() {
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => void handleClaim(r)}
-                      disabled={busy}
+                      disabled={busy || !verifiedWallet}
+                      title={
+                        verifiedWallet
+                          ? `Claim to ${shortenAddress(verifiedWallet.address)}`
+                          : "Verify a wallet before claiming"
+                      }
                     >
-                      Claim
+                      {busy ? "Claiming…" : "Claim"}
                     </button>
                   </div>
                 ))
               )}
+              {available.length > 0 && !verifiedWallet && (
+                <p className="muted">Verify wallet ownership before claiming.</p>
+              )}
+              <ClaimStatusBanner step={step} />
             </div>
 
             <div className="card" style={{ marginTop: 20 }}>
@@ -133,8 +141,29 @@ export default function WalletPage() {
           </div>
         </div>
       )}
-
-      {message && <div className="banner banner-error">{message}</div>}
     </div>
   );
+}
+
+function ClaimStatusBanner({ step }: { step: ReturnType<typeof useClaimFlow>["step"] }) {
+  if (step.phase === "idle") return null;
+  if (step.phase === "error") {
+    return <div className="banner banner-error">{step.message}</div>;
+  }
+  if (step.phase === "submitted") {
+    return (
+      <div className="banner">
+        Claim submitted ({step.claim.status}). Transaction{" "}
+        <code>{shortenAddress(step.hash, 8)}</code> — the reward is marked claimed once the
+        transaction is confirmed on-chain.
+      </div>
+    );
+  }
+  const labels: Record<string, string> = {
+    creating: "Creating claim…",
+    authorizing: "Requesting claim authorization…",
+    "awaiting-wallet": "Confirm the transaction in your wallet…",
+    recording: "Recording the transaction…",
+  };
+  return <div className="banner">{labels[step.phase] ?? ""}</div>;
 }

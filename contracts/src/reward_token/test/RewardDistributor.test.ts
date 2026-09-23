@@ -70,7 +70,10 @@ describe("RewardDistributor", function () {
     const amount = ethers.parseEther("5");
     const nonce = 1n;
     const chainId = BigInt(31337);
-    const deadline = BigInt(Math.floor(Date.now() / 1000) - 60); // expired
+
+    // Use the chain's own clock: wall-clock time can drift from EVM time.
+    const latest = await ethers.provider.getBlock("latest");
+    const deadline = BigInt(latest!.timestamp - 60); // already expired
     const signature = await signClaim(
       deployer, await distributor.getAddress(), await distributor.rewardToken(),
       seller.address, rewardId, amount, nonce, deadline, chainId

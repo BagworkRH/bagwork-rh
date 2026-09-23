@@ -157,6 +157,28 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 
+# Periodic blockchain jobs (Spec 04/05). Each task reports a "disabled" status
+# when RPC_URL/CONTRACT_ADDRESS are unset, so the scheduler is safe to run
+# before testnet deployment.
+CELERY_BEAT_SCHEDULE = {
+    "poll-reward-claimed-events": {
+        "task": "apps.blockchain.tasks.process_claim_events",
+        "schedule": 120.0,  # every 2 minutes
+    },
+    "expire-stale-claims": {
+        "task": "apps.blockchain.tasks.expire_stale_claims",
+        "schedule": timedelta(minutes=15),
+    },
+    "monitor-anomalous-claims": {
+        "task": "apps.blockchain.tasks.monitor_anomalous_claims",
+        "schedule": timedelta(hours=1),
+    },
+    "reconcile-blockchain-ledger": {
+        "task": "apps.blockchain.tasks.reconcile_blockchain_ledger",
+        "schedule": timedelta(hours=6),
+    },
+}
+
 # Frontend URL used for building callback links etc.
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
@@ -165,6 +187,19 @@ X_PROVIDER = os.environ.get("X_PROVIDER", "official")
 X_CLIENT_ID = os.environ.get("X_CLIENT_ID", "")
 X_CLIENT_SECRET = os.environ.get("X_CLIENT_SECRET", "")
 X_REDIRECT_URI = os.environ.get("X_REDIRECT_URI", "")
+
+# Blockchain (Spec 04)
+# RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and
+# claim/listener/reconciliation tasks report "disabled" instead of failing.
+CHAIN_ID = int(os.environ.get("CHAIN_ID", "11155111"))          # Sepolia testnet
+RPC_URL = os.environ.get("RPC_URL", "")
+CONTRACT_ADDRESS = os.environ.get("CONTRACT_ADDRESS", "")       # RewardDistributor
+REWARD_TOKEN_ADDRESS = os.environ.get("REWARD_TOKEN_ADDRESS", "")
+# Claim-authorization signer (private key, testnet dev key). NEVER commit a
+# production key. Signer address is derived from the key at runtime.
+CLAIM_SIGNER = os.environ.get("CLAIM_SIGNER", "")
+CLAIM_SIGNER_ADDRESS = os.environ.get("CLAIM_SIGNER_ADDRESS", "")
+DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
 
 # Logging
 LOGGING = {

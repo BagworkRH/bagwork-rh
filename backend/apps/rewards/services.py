@@ -235,7 +235,21 @@ def calculate_reward(campaign, post, seller, snapshot=None, *, user=None) -> Rew
             },
         )
 
+        from apps.blockchain.ledger import record  # noqa: PLC0415 - lazy: avoids an import cycle
+        from apps.blockchain.models import LedgerAction  # noqa: PLC0415 - lazy import
+
+        record(
+            LedgerAction.REWARD_EARNED,
+            seller=seller,
+            reward=reward,
+            token_symbol=reward.token_symbol,
+            amount=reward.amount,
+            amount_smallest_unit=0,
+        )
+
     return reward
+
+
 def approve_reward(reward, *, actor=None) -> Reward:
     """Approve a reward: PENDING -> APPROVED with budget already reserved.
 
@@ -257,6 +271,18 @@ def approve_reward(reward, *, actor=None) -> Reward:
             object_type="Reward",
             object_id=str(locked.pk),
             metadata={"amount": str(locked.amount), "seller_code": locked.seller.seller_code},
+        )
+
+        # Ledger entry (Spec 04): the platform now owes this seller money.
+        from apps.blockchain.ledger import record  # noqa: PLC0415 - lazy: avoids an import cycle
+        from apps.blockchain.models import LedgerAction  # noqa: PLC0415 - lazy import
+
+        record(
+            LedgerAction.REWARD_APPROVED,
+            seller=locked.seller,
+            reward=locked,
+            token_symbol=locked.token_symbol,
+            amount=locked.amount,
         )
     return locked
 

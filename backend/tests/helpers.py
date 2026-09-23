@@ -3,11 +3,16 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.utils import timezone
+from eth_account import Account
 
+from apps.blockchain import signing
+from apps.blockchain.models import TokenConfig
 from apps.campaigns.models import Campaign, CampaignStatus, RewardModel
 from apps.sellers.models import SellerProfile
 from apps.social.models import PostVerificationStatus, SocialPost
+from apps.wallets.models import Wallet
 
 User = get_user_model()
 
@@ -63,6 +68,138 @@ def make_campaign(  # noqa: PLR0913 - test helper with sensible defaults
         created_by=admin,
     )
     return campaign
+
+
+def make_token_config(
+    symbol="TST",
+    chain_id=11155111,
+    address="0x00000000000000000000000000000000000000AA",
+    decimals=18,
+):
+    """Allowlist a reward token (Spec 04) so claims can be authorized.
+
+    Idempotent: `symbol` and `address` are both unique, so tests can call this
+    without coordinating with other helpers.
+    """
+    token, _ = TokenConfig.objects.get_or_create(
+        symbol=symbol,
+        defaults={
+            "chain_id": chain_id,
+            "address": address,
+            "decimals": decimals,
+            "enabled": True,
+        },
+    )
+    return token
+
+
+def claim_signer_key():
+    """Deterministic test private key for the claim-authorization signer."""
+    return "0x" + "11" * 32
+
+
+def signer_address():
+    return Account.from_key(claim_signer_key()).address
+
+
+def signer_settings(contract_address="0x00000000000000000000000000000000000000BB"):
+    """Settings override enabling the signed-claim flow in tests.
+
+    RPC_URL stays empty on purpose: signing must work without a node, and the
+    listener/reconciliation tasks must keep reporting "disabled".
+    """
+    return override_settings(
+        CONTRACT_ADDRESS=contract_address,
+        CLAIM_SIGNER=claim_signer_key(),
+        RPC_URL="",
+    )
+
+
+# --- Ethers.js cross-check fixtures (Phase 6) ------------------------------ #
+# Generated with the real JS stack (`ethers.Interface` / `TypedDataEncoder` /
+# `Wallet.signTypedData`) in contracts/src/reward_token/_crosscheck.js. The
+# Python signing + ABI code must reproduce these byte-for-byte, which proves the
+# backend and the contract agree on the EIP-712 domain/struct and calldata.
+CROSS_CHECK = {
+    'chain_id': 11155111,
+    'contract_address': '0x00000000000000000000000000000000000000BB',
+    'token_address': '0x00000000000000000000000000000000000000AA',
+    'wallet': '0x1111111111111111111111111111111111111111',
+    'reward_id': 1,
+    'amount_smallest_unit': 5000000000000000000,
+    'nonce': 1,
+    'deadline': 1893456000,
+    'selector': '0xedc19c89',
+    'domain_separator': '0xad9e6b8f19d5ae1822fb8aa5154210aab152b82cc8835a0bf1bfef8150564380',
+    'struct_hash': '0xc5522b7413d2712d519e432925a4d2ec67c65088278e7657ac0310e440277e65',
+    'digest': '0x793fe8619d655c2a386356b2885e5a61c73c0aeef1490461815163dad8c3aa06',
+    'signer_address': '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A',
+    'signature': (
+        "0x370df1461a98577794a7d00b393ab5e8cf6af65a6f4703734c8b356e97ed8b"
+        "8d40ecae7ad29bc8520e0806014853ddde4eed3e886b00c1a57bb279c4850eaf"
+        "791c"
+    ),
+    'calldata': (
+        "0xedc19c89000000000000000000000000000000000000000000000000000000"
+        "0000000001000000000000000000000000111111111111111111111111111111"
+        "1111111111000000000000000000000000000000000000000000000000456391"
+        "8244f40000000000000000000000000000000000000000000000000000000000"
+        "0000000001000000000000000000000000000000000000000000000000000000"
+        "0070dbd880000000000000000000000000000000000000000000000000000000"
+        "00000000c0000000000000000000000000000000000000000000000000000000"
+        "0000000041370df1461a98577794a7d00b393ab5e8cf6af65a6f4703734c8b35"
+        "6e97ed8b8d40ecae7ad29bc8520e0806014853ddde4eed3e886b00c1a57bb279"
+        "c4850eaf791c0000000000000000000000000000000000000000000000000000"
+        "0000000000"
+    ),
+}
+
+
+def cross_check_claim_digest():
+    """The ethers-defined Claim struct for the cross-check fixture."""
+    return signing.build_claim_digest(
+        wallet=CROSS_CHECK["wallet"],
+        reward_id=CROSS_CHECK["reward_id"],
+        token_address=CROSS_CHECK["token_address"],
+        amount=CROSS_CHECK["amount_smallest_unit"],
+        nonce=CROSS_CHECK["nonce"],
+        deadline=CROSS_CHECK["deadline"],
+        chain_id=CROSS_CHECK["chain_id"],
+        contract_address=CROSS_CHECK["contract_address"],
+    )
+
+
+def chain_settings(rpc_url="http://127.0.0.1:8545"):
+    """Settings override with a contract + RPC configured.
+
+    The RPC URL deliberately points at nothing: `get_web3()` returns None when
+    the node is unreachable, so listener/reconciliation paths stay in their
+    "disabled" branch while `chain_enabled()` reports configured.
+    """
+    return override_settings(
+        CONTRACT_ADDRESS=CROSS_CHECK["contract_address"],
+        RPC_URL=rpc_url,
+        CHAIN_ID=CROSS_CHECK["chain_id"],
+    )
+
+
+def make_verified_wallet(
+    profile,
+    address="0x1111111111111111111111111111111111111111",
+    chain_id=11155111,
+    verified=True,
+):
+    """Create a wallet row for a seller (ownership verification bypassed).
+
+    Idempotent on (seller, address, chain_id) so helpers can be combined freely.
+    """
+    wallet, _ = Wallet.objects.get_or_create(
+        seller=profile,
+        address=address.lower(),
+        chain_id=chain_id,
+        defaults={"verified": verified, "nonce": "" if verified else "abc123"},
+    )
+    return wallet
 
 
 def make_verified_post(profile, campaign, external_id="123456789", text="#"):

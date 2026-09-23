@@ -71,6 +71,40 @@ export function useWallet() {
     [connection, ethereum]
   );
 
+  /**
+   * Ask the wallet to send a transaction (the claim calldata is built by the
+   * backend, so nothing is encoded client-side).
+   */
+  const sendTransaction = useCallback(
+    async (transaction: { to: string; data: string; value?: string }): Promise<string | null> => {
+      if (connection.status !== "connected" || !ethereum?.ethereum) {
+        setError("Connect a wallet before sending a transaction.");
+        return null;
+      }
+      try {
+        const hash = await ethereum.ethereum.request<string>({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              from: connection.address,
+              to: transaction.to,
+              value: transaction.value ?? "0x0",
+              data: transaction.data,
+            },
+          ],
+        });
+        setError(null);
+        return hash;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "The wallet rejected the transaction."
+        );
+        return null;
+      }
+    },
+    [connection, ethereum]
+  );
+
   const switchNetwork = useCallback(
     async (chainId: number): Promise<boolean> => {
       if (connection.status !== "connected" || !ethereum?.ethereum) return false;
@@ -96,5 +130,5 @@ export function useWallet() {
     [connection, ethereum]
   );
 
-  return { connection, error, connect, signMessage, switchNetwork };
+  return { connection, error, connect, signMessage, sendTransaction, switchNetwork };
 }

@@ -71,6 +71,7 @@ class Claim(models.Model):
     transaction_hash = models.CharField(max_length=66, blank=True)
     failure_reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
+    submitted_at = models.DateTimeField(null=True, blank=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     expired_at = models.DateTimeField(null=True, blank=True)
 

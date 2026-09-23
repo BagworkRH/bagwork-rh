@@ -1,15 +1,22 @@
 """Views for the authenticated user's own data under /me/."""
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.serializers import UserSerializer
+from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.models import Reward, RewardStatus
 from apps.social.models import PostVerificationStatus, SocialPost
 from apps.wallets.models import Claim, Wallet
+from apps.wallets.services import (
+    create_or_get_wallet,
+    verify_wallet_signature,
+    wallet_nonce_message,
+)
 
 from .models import SellerProfile
 from .serializers import SellerDashboardSerializer, SellerProfileSerializer
@@ -39,9 +46,40 @@ def seller_profile(request):
     return Response(serializer.data)
 
 
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def my_wallets(request):
+    """List the user's wallets, or register a new one (POST returns a nonce)."""
+    if request.method == "POST":
+        address = request.data.get("address", "").strip()
+        chain_id = request.data.get("chain_id")
+        if not address or not chain_id:
+            return Response(
+                {"detail": "address and chain_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        seller = getattr(request.user, "seller_profile", None)
+        if seller is None:
+            return Response(
+                {"detail": "Seller profile required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        wallet = create_or_get_wallet(seller, address, int(chain_id), actor=request.user)
+        return Response(
+            {
+                "id": wallet.id,
+                "address": wallet.address,
+                "chain_id": wallet.chain_id,
+                "wallet_type": wallet.wallet_type,
+                "verified": wallet.verified,
+                "nonce": wallet.nonce,
+                # The exact string the wallet must sign; the frontend passes it
+                # straight to personal_sign.
+                "message": wallet_nonce_message(wallet),
+                "connected_at": wallet.connected_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
     wallets = Wallet.objects.filter(seller__user=request.user)
     return Response(
         [
@@ -55,6 +93,50 @@ def my_wallets(request):
             }
             for w in wallets
         ]
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def wallet_verify(request, pk):
+    """Verify wallet ownership from a signed nonce (Spec 04).
+
+    Body: {"signature": "0x..."} where the signature is `personal_sign` over
+    the exact `message` returned by POST /me/wallets/.
+
+    Ownership is proven cryptographically: the address alone is never trusted,
+    and the nonce is single-use (cleared once verification succeeds).
+    """
+    seller = getattr(request.user, "seller_profile", None)
+    if seller is None:
+        return Response({"detail": "Seller profile required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    wallet = get_object_or_404(Wallet, pk=pk, seller=seller)
+    signature = (request.data.get("signature") or "").strip()
+    if not signature:
+        return Response(
+            {"detail": "signature is required."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    if not wallet.nonce:
+        return Response(
+            {"detail": "No pending verification for this wallet. Re-register it to get a nonce."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    try:
+        wallet = verify_wallet_signature(wallet, signature, actor=request.user)
+    except RewardEngineError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+        {
+            "id": wallet.id,
+            "address": wallet.address,
+            "chain_id": wallet.chain_id,
+            "wallet_type": wallet.wallet_type,
+            "verified": wallet.verified,
+            "connected_at": wallet.connected_at.isoformat(),
+        }
     )
 
 

@@ -3,17 +3,21 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
-import { apiRequest, setToken } from "@/lib/api";
+import { registerWallet, verifyWallet } from "@/services/wallet";
 import { shortenAddress } from "@/lib/constants";
 
 /**
  * Wallet connection + ownership verification (Spec 04).
- * A nonce signature proves ownership; the address alone is never sufficient.
+ *
+ * Ownership is proven by a signature over the server-issued nonce message: the
+ * backend registers the wallet, returns the exact message to sign, and only
+ * marks the wallet verified when the recovered signer matches the address.
  */
-export default function ConnectWalletButton({ onConnected }: { onConnected?: () => void }) {
+export default function ConnectWalletButton({ onVerified }: { onVerified?: () => void }) {
   const { connection, connect, signMessage, switchNetwork } = useWallet();
   const { user } = useAuth();
-  const [status, setStatus] = useState<"idle" | "signing" | "loading">("idle");
+  const [status, setStatus] = useState<"idle" | "working">("idle");
+  const [verified, setVerified] = useState(false);
   const [message, setMessage] = useState<string>("");
 
   if (!user) {
@@ -26,37 +30,43 @@ export default function ConnectWalletButton({ onConnected }: { onConnected?: () 
   }
 
   async function handleConnect() {
-    setStatus("loading");
-    const conn = await connect();
-    if (!conn || conn.status !== "connected") {
-      setStatus("idle");
-      return;
-    }
-
-    // Create a wallet on the backend to obtain a verification nonce.
+    setStatus("working");
+    setMessage("");
+    setVerified(false);
     try {
-      const wallet = await apiRequest<{ nonce: string; address: string }>(
-        "/api/v1/me/wallets/",
-        { method: "POST", auth: true, body: { address: conn.address, chain_id: conn.chainId } }
-      );
-      setStatus("signing");
-      const signature = await signMessage(
-        `CryptoSocialRewards: verify wallet ownership.\nWallet: ${wallet.address}\nChain: ${conn.chainId}\nNonce: ${wallet.nonce}`
-      );
-      if (!signature) {
-        setStatus("idle");
+      const conn = await connect();
+      if (!conn || conn.status !== "connected") {
+        setMessage("Wallet connection was not completed.");
         return;
       }
 
-      setToken("UNSET"); // placeholder; replaced by real token exchange in tests
-      onConnected?.();
-      setStatus("idle");
-      setMessage("Wallet connected. Verification flow ready on next backend step.");
+      // 1. Register the address and receive the nonce message to sign.
+      const challenge = await registerWallet(conn.address, conn.chainId);
+
+      // 2. Ask the wallet to sign exactly the message the server will verify.
+      const signature = await signMessage(challenge.message);
+      if (!signature) {
+        setMessage("Signature was not provided; ownership is unverified.");
+        return;
+      }
+
+      // 3. The server verifies the signature and marks ownership verified.
+      const wallet = await verifyWallet(challenge.id, signature);
+      setVerified(wallet.verified);
+      setMessage(
+        wallet.verified
+          ? "Wallet verified: ownership proven by signature."
+          : "Wallet could not be verified."
+      );
+      if (wallet.verified) onVerified?.();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Wallet step failed.");
+      setMessage(err instanceof Error ? err.message : "Wallet verification failed.");
+    } finally {
       setStatus("idle");
     }
   }
+
+  const wrongNetwork = connection.status === "connected" && connection.chainId !== 11155111;
 
   return (
     <div className="card">
@@ -64,27 +74,45 @@ export default function ConnectWalletButton({ onConnected }: { onConnected?: () 
       {connection.status === "connected" ? (
         <p>
           Connected: <strong>{shortenAddress(connection.address)}</strong> on chain{" "}
-          {connection.chainId}. <span className="badge badge-ok">Ownership pending</span>
+          {connection.chainId}.{" "}
+          {verified ? (
+            <span className="badge badge-ok">verified</span>
+          ) : (
+            <span className="badge">ownership pending</span>
+          )}
         </p>
       ) : (
-        <p className="muted">Connect an EVM-compatible wallet. We never ask for your private key.</p>
+        <p className="muted">
+          Connect an EVM-compatible wallet. We never ask for your private key or seed phrase.
+        </p>
       )}
-      <button
-        className="btn btn-primary"
-        onClick={() => void handleConnect()}
-        disabled={status !== "idle"}
-      >
-        {status === "signing" ? "Check wallet…" : "Connect Wallet"}
-      </button>
-      {message && <p className="muted">{message}</p>}
+
+      {wrongNetwork && (
+        <p className="muted">
+          This platform rewards on Sepolia (chain 11155111). Switch networks in your wallet to
+          continue.
+        </p>
+      )}
+
       <div className="row">
         <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => void switchNetwork(11155111)}
+          className="btn btn-primary"
+          onClick={() => void handleConnect()}
+          disabled={status === "working"}
         >
-          Switch to Sepolia
+          {status === "working" ? "Waiting for wallet…" : "Connect & verify wallet"}
         </button>
+        {wrongNetwork && (
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={() => void switchNetwork(11155111)}
+          >
+            Switch to Sepolia
+          </button>
+        )}
       </div>
+
+      {message && <p className="muted">{message}</p>}
     </div>
   );
 }

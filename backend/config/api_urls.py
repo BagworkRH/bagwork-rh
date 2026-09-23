@@ -15,4 +15,5 @@ urlpatterns = [
     path("posts/", include("apps.social.post_urls")),
     path("rewards/", include("apps.rewards.urls")),
     path("claims/", include("apps.wallets.urls")),
+    path("blockchain/", include("apps.blockchain.urls")),
 ]

@@ -125,15 +125,72 @@ export interface Claim {
   id: number;
   seller_code: string;
   wallet: string;
+  wallet_id: number;
   reward: number | null;
   amount: string;
+  amount_smallest_unit: number;
   token_symbol: string;
   chain_id: number;
   status: ClaimStatus;
   transaction_hash?: string;
   failure_reason?: string;
+  expired_at?: string | null;
   created_at: string;
+  submitted_at?: string | null;
   confirmed_at?: string | null;
+}
+
+/** A claim as returned by POST /api/v1/claims/ (claim + signed authorization). */
+export interface ClaimWithAuthorization extends Claim {
+  authorization: ClaimAuthorization | null;
+  authorization_ready: boolean;
+  authorization_unavailable?: string;
+}
+
+/**
+ * Server-signed EIP-712 claim authorization (Spec 04).
+ *
+ * `transaction` is fully ABI-encoded by the backend, so the frontend only asks
+ * the wallet provider to send it — no client-side ABI encoding is needed.
+ */
+export interface ClaimAuthorization {
+  claim_id: number;
+  status: ClaimStatus;
+  signature: string;
+  wallet: string;
+  reward_id: number;
+  token: string;
+  token_symbol: string;
+  token_decimals: number;
+  amount_smallest_unit: number;
+  amount: string;
+  nonce: number;
+  nonce_hex: string;
+  deadline: number;
+  chain_id: number;
+  contract_address: string;
+  signer_address: string;
+  domain: { name: string; version: string; chainId: number };
+  function: string;
+  transaction: {
+    to: string;
+    from: string;
+    value: string;
+    data: string;
+    chain_id: number;
+  };
+}
+
+/** Wallet registration response: the nonce and the exact message to sign. */
+export interface WalletChallenge {
+  id: number;
+  address: string;
+  chain_id: number;
+  wallet_type: string;
+  verified: boolean;
+  nonce: string;
+  message: string;
+  connected_at: string;
 }
 
 export interface SellerDashboard {
