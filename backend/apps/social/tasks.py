@@ -82,10 +82,12 @@ def calculate_pending_rewards():
 
 
 @shared_task
-def flag_suspicious_activity():
-    """Risk scoring stub: reviews posts with abnormal engagement spikes.
+def flag_suspicious_activity(hours: int = 24):
+    """Score recent posts and queue risk flags for human review (Spec 03).
 
-    Marked DEVELOPMENT: heuristic refinement and the review queue arrive in a
-    later phase; this never auto-accuses anyone.
+    Delegates to `apps.audit.risk`; nothing is enforced automatically — the
+    flag only describes the signals and their combined score.
     """
-    return {"checked": 0, "flagged": []}
+    from apps.audit import risk  # noqa: PLC0415
+
+    return risk.scan_recent_posts(hours)

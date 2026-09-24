@@ -4,6 +4,8 @@ Endpoints described in Spec 02:
   /auth/*   register, login, logout
   /me/*     user, seller, wallets, rewards, claims
   /campaigns/, /x/, /posts/, /rewards/, /claims/
+  /blockchain/  chain status + emergency controls
+  /admin/*      staff-only back-office (Spec 05 Phase 7); Django admin is at /admin/
 """
 from django.urls import include, path
 
@@ -16,4 +18,5 @@ urlpatterns = [
     path("rewards/", include("apps.rewards.urls")),
     path("claims/", include("apps.wallets.urls")),
     path("blockchain/", include("apps.blockchain.urls")),
+    path("admin/", include("apps.audit.admin_urls")),
 ]

@@ -25,10 +25,17 @@ def make_user(email="seller@example.com", username="seller", password="Testpass1
 
 
 def make_staff(email="admin@example.com", username="admin"):
-    user = User.objects.create_user(
+    """Create a staff user, reusing an existing one with the same email.
+
+    Idempotent on email so helpers that each create their own admin
+    (e.g. `make_campaign`) can be combined freely in one test.
+    """
+    existing = User.objects.filter(email=email).first()
+    if existing is not None:
+        return existing
+    return User.objects.create_user(
         username=username, email=email, password="Testpass123!", is_staff=True
     )
-    return user
 
 
 def make_campaign(  # noqa: PLR0913 - test helper with sensible defaults

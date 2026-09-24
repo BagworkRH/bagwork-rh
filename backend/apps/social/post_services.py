@@ -15,6 +15,16 @@ from .models import PostMetricSnapshot, PostVerificationStatus, SocialPost
 
 ALLOWED_METRIC_FIELDS = ("likes", "reposts", "replies", "quotes", "bookmarks")
 
+# Failure states a reviewer may apply when rejecting a post (Spec 03).
+REVIEW_REJECTION_STATUSES = (
+    PostVerificationStatus.NOT_ELIGIBLE,
+    PostVerificationStatus.DUPLICATE,
+    PostVerificationStatus.OUTSIDE_CAMPAIGN_WINDOW,
+    PostVerificationStatus.REQUIREMENT_MISSING,
+    PostVerificationStatus.PROVIDER_ERROR,
+    PostVerificationStatus.SUSPICIOUS_ACTIVITY,
+)
+
 
 def create_post_from_provider(seller, campaign, payload, *, actor=None) -> SocialPost:
     """Create a post record in DISCOVERED state from provider data.
@@ -99,3 +109,56 @@ def run_verification(post, *, snapshot=None, actor=None) -> SocialPost:
         metadata={"external_post_id": post.external_post_id, "campaign_id": campaign.pk},
     )
     return post
+
+
+def review_post(post, decision, reason="", rejection_status="", *, actor=None) -> SocialPost:
+    """Human review of a tracked post from the admin back-office (Spec 05 Phase 7).
+
+    Records at most a verification status + reason; it never pays out or deletes
+    anything. Approving marks the post VERIFIED (rewards are still calculated
+    separately by the reward engine), rejecting applies a Spec 03 failure state.
+    """
+    from apps.rewards.exceptions import RewardEngineError  # noqa: PLC0415 - shared domain error
+
+    decision = (decision or "").strip().lower()
+    if decision in ("approve", "approved", "verify", "verified"):
+        previous = post.verification_status
+        post.set_verification(PostVerificationStatus.VERIFIED, "")
+        AuditLog.objects.create(
+            actor=actor,
+            action="POST_REVIEW_APPROVED",
+            object_type="SocialPost",
+            object_id=str(post.pk),
+            metadata={
+                "external_post_id": post.external_post_id,
+                "seller_code": post.seller.seller_code,
+                "from": previous,
+                "to": PostVerificationStatus.VERIFIED,
+            },
+        )
+        return post
+
+    if decision in ("reject", "rejected"):
+        status_value = rejection_status or PostVerificationStatus.NOT_ELIGIBLE
+        if status_value not in REVIEW_REJECTION_STATUSES:
+            raise RewardEngineError(
+                "rejection_status must be one of: " + ", ".join(REVIEW_REJECTION_STATUSES) + "."
+            )
+        if not reason:
+            raise RewardEngineError("A rejection reason is required.")
+        post.set_verification(status_value, reason[:255])
+        AuditLog.objects.create(
+            actor=actor,
+            action="POST_REVIEW_REJECTED",
+            object_type="SocialPost",
+            object_id=str(post.pk),
+            metadata={
+                "external_post_id": post.external_post_id,
+                "seller_code": post.seller.seller_code,
+                "status": status_value,
+                "reason": reason,
+            },
+        )
+        return post
+
+    raise RewardEngineError("decision must be approve or reject.")

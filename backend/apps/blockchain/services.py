@@ -5,15 +5,11 @@ application never depends on a raw provider/RPC. When `RPC_URL` /
 `CONTRACT_ADDRESS` are unset the chain features report *disabled* rather than
 raising, so the platform keeps working without a node.
 """
-from datetime import timedelta
-
 from django.conf import settings
-from django.db import models as dj_models
-from django.utils import timezone
 from web3 import Web3
 
 from apps.audit.models import AuditLog
-from apps.wallets.models import Claim, ClaimStatus
+from apps.wallets.models import ClaimStatus
 
 from . import abi, signing
 from .models import PlatformControl, TokenConfig
@@ -227,18 +223,12 @@ def rotate_claim_signer(new_key: str, *, actor=None):
 
 
 def monitor_claim_volume(threshold_per_hour: int = 20):
-    """Flag sellers with unusual claim volume (Spec 04: monitor, never accuse).
+    """Queue sellers with unusual claim volume for human review (Spec 04).
 
-    DEVELOPMENT STUB: returns current stats; review-queue integration arrives
-    with the fraud/risk queue (Phase 7).
+    Claim volume alone is weak evidence, so this only ever creates a risk-flag
+    queue entry (see `apps.audit.risk.evaluate_claim_volume`); it never blocks,
+    reverses, or accuses anything automatically.
     """
-    claims = Claim.objects.filter(
-        created_at__gte=timezone.now() - timedelta(hours=1)
-    )
-    stats = list(
-        claims.values("seller__seller_code")
-        .annotate(count=dj_models.Count("id"))
-        .order_by("-count")
-    )
-    flagged = [s for s in stats if s["count"] >= threshold_per_hour]
-    return {"checked": len(stats), "flagged": flagged}
+    from apps.audit import risk  # noqa: PLC0415 - lazy: avoids an import cycle
+
+    return risk.evaluate_claim_volume(threshold_per_hour)

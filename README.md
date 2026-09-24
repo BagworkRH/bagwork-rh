@@ -35,7 +35,7 @@ python -m venv .venv
 pip install -r requirements/dev.txt
 copy .env.example .env           # fill in values (SQLite fallback works out of the box)
 python manage.py migrate
-python manage.py test tests      # 111 tests
+python manage.py test tests      # 157 tests
 python manage.py runserver       # http://localhost:8000/api/health/
 ```
 

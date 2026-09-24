@@ -5,7 +5,7 @@ from apps.audit.models import AuditLog
 from apps.rewards.exceptions import RewardEngineError
 from apps.sellers.models import SellerProfile
 
-from .models import CampaignParticipation, CampaignStatus
+from .models import Campaign, CampaignParticipation, CampaignStatus
 
 
 def join_campaign(seller, campaign, *, actor=None) -> CampaignParticipation:
@@ -53,3 +53,37 @@ def join_campaign(seller, campaign, *, actor=None) -> CampaignParticipation:
         metadata={"seller_code": seller.seller_code, "campaign": campaign.slug},
     )
     return participation
+
+
+def set_campaign_status(campaign, new_status, reason="", *, actor=None) -> Campaign:
+    """Change a campaign's status from the admin back-office (Spec 04 emergency controls).
+
+    Pausing or cancelling a campaign also disables claiming for its rewards
+    (enforced in `apps.wallets.services.create_claim`). Every change is audited.
+    """
+    from django.db import transaction  # noqa: PLC0415 - local import keeps the module import-light
+
+    if new_status not in CampaignStatus.values:
+        raise RewardEngineError(
+            "status must be one of: " + ", ".join(CampaignStatus.values) + "."
+        )
+
+    with transaction.atomic():
+        locked = Campaign.objects.select_for_update().get(pk=campaign.pk)
+        previous = locked.status
+        locked.status = new_status
+        locked.save(update_fields=["status", "updated_at"])
+
+    AuditLog.objects.create(
+        actor=actor,
+        action="CAMPAIGN_STATUS_CHANGED",
+        object_type="Campaign",
+        object_id=str(locked.pk),
+        metadata={
+            "slug": locked.slug,
+            "from": previous,
+            "to": new_status,
+            "reason": reason,
+        },
+    )
+    return locked

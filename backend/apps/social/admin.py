@@ -1,6 +1,37 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import PostMetricSnapshot, SocialPost, XAccount
+
+
+@admin.action(description="Approve selected posts (mark VERIFIED)")
+def approve_posts(modeladmin, request, queryset):
+    from apps.rewards.exceptions import RewardEngineError  # noqa: PLC0415
+
+    from .post_services import review_post  # noqa: PLC0415
+
+    done = 0
+    for post in queryset:
+        try:
+            review_post(post, "approve", actor=request.user)
+            done += 1
+        except RewardEngineError as exc:  # pragma: no cover - defensive
+            messages.error(request, f"Post {post.pk}: {exc}")
+    messages.success(request, f"Approved {done} post(s).")
+
+
+@admin.action(description="Mark selected posts SUSPICIOUS_ACTIVITY")
+def flag_posts_suspicious(modeladmin, request, queryset):
+    from .post_services import review_post  # noqa: PLC0415
+
+    for post in queryset:
+        review_post(
+            post,
+            "reject",
+            "Flagged by admin review.",
+            "SUSPICIOUS_ACTIVITY",
+            actor=request.user,
+        )
+    messages.warning(request, f"Flagged {queryset.count()} post(s) as suspicious.")
 
 
 @admin.register(XAccount)
@@ -24,6 +55,8 @@ class SocialPostAdmin(admin.ModelAdmin):
     list_filter = ("verification_status",)
     search_fields = ("external_post_id", "seller__seller_code", "campaign__name")
     date_hierarchy = "published_at"
+    actions = [approve_posts, flag_posts_suspicious]
+    readonly_fields = ("rejection_reason", "updated_at")
 
 
 @admin.register(PostMetricSnapshot)

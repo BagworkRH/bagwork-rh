@@ -177,6 +177,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.blockchain.tasks.reconcile_blockchain_ledger",
         "schedule": timedelta(hours=6),
     },
+    "scan-risk-signals": {
+        "task": "apps.social.tasks.flag_suspicious_activity",
+        "schedule": timedelta(hours=1),
+    },
 }
 
 # Frontend URL used for building callback links etc.
@@ -200,6 +204,10 @@ REWARD_TOKEN_ADDRESS = os.environ.get("REWARD_TOKEN_ADDRESS", "")
 CLAIM_SIGNER = os.environ.get("CLAIM_SIGNER", "")
 CLAIM_SIGNER_ADDRESS = os.environ.get("CLAIM_SIGNER_ADDRESS", "")
 DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
+
+# Fraud/risk review queue (Spec 03 anti-fraud). Signals scoring at or above this
+# threshold are queued for human review; nothing is ever actioned automatically.
+RISK_REVIEW_THRESHOLD = int(os.environ.get("RISK_REVIEW_THRESHOLD", "30"))
 
 # Logging
 LOGGING = {

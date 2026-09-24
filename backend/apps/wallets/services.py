@@ -97,9 +97,13 @@ def create_claim(seller, wallet, reward, *, actor=None) -> Claim:
     (Spec 04).
     """
     from apps.blockchain import services as chain  # noqa: PLC0415 - lazy: avoids an import cycle
+    from apps.sellers.models import SellerProfile  # noqa: PLC0415 - lazy: avoids an import cycle
 
     if chain.is_claiming_paused():
         raise RewardEngineError("Claiming is temporarily paused. Please retry later.")
+
+    if seller.status != SellerProfile.Status.ACTIVE:
+        raise RewardEngineError("Your seller account is not active.")
 
     campaign = reward.campaign
     if campaign and campaign.status in ("PAUSED", "CANCELLED"):
