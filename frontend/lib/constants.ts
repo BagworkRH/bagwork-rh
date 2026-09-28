@@ -4,18 +4,29 @@ export const BRAND_NAME = "bagworkRH";
 
 export const SUPPORTED_NETWORKS = [
   {
+    // Robinhood Chain testnet — the launch chain.
+    chainId: 46630,
+    name: "Robinhood Chain Testnet",
+    token: "ETH",
+    rpcUrl: "https://rpc.testnet.chain.robinhood.com",
+    explorerUrl: "https://explorer.testnet.chain.robinhood.com",
+    testnet: true,
+  },
+  {
+    chainId: 4663,
+    name: "Robinhood Chain",
+    token: "ETH",
+    rpcUrl: "https://rpc.mainnet.chain.robinhood.com",
+    explorerUrl: "https://robinhoodchain.blockscout.com",
+    testnet: false,
+  },
+  {
     chainId: 11155111,
     name: "Sepolia",
     token: "ETH",
     rpcUrl: "https://rpc.sepolia.org",
+    explorerUrl: "https://sepolia.etherscan.io",
     testnet: true,
-  },
-  {
-    chainId: 1,
-    name: "Ethereum",
-    token: "ETH",
-    rpcUrl: "https://eth.llamarpc.com",
-    testnet: false,
   },
 ] as const;
 

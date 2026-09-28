@@ -226,10 +226,18 @@ X_REDIRECT_URI = os.environ.get("X_REDIRECT_URI", "")
 # Blockchain (Spec 04)
 # RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and
 # claim/listener/reconciliation tasks report "disabled" instead of failing.
-CHAIN_ID = int(os.environ.get("CHAIN_ID", "11155111"))          # Sepolia testnet
+# Default chain is Robinhood Chain testnet (Arbitrum L2), the launch chain:
+#   testnet: CHAIN_ID=46630  https://rpc.testnet.chain.robinhood.com
+#   mainnet: CHAIN_ID=4663   https://rpc.mainnet.chain.robinhood.com
+CHAIN_ID = int(os.environ.get("CHAIN_ID", "46630"))          # Robinhood Chain testnet
 RPC_URL = os.environ.get("RPC_URL", "")
 CONTRACT_ADDRESS = os.environ.get("CONTRACT_ADDRESS", "")       # RewardDistributor
 REWARD_TOKEN_ADDRESS = os.environ.get("REWARD_TOKEN_ADDRESS", "")
+# EIP-712 domain name. MUST match RewardDistributor.sol exactly: it is hashed
+# into the on-chain DOMAIN_SEPARATOR, and a mismatch means every signature the
+# backend produces is rejected by the contract. Deploy-time guard lives in
+# contracts/src/reward_token/scripts/deploy.ts.
+EIP712_DOMAIN_NAME = os.environ.get("EIP712_DOMAIN_NAME", "bagworkRH")
 # Claim-authorization signer (private key, testnet dev key). NEVER commit a
 # production key. Signer address is derived from the key at runtime.
 CLAIM_SIGNER = os.environ.get("CLAIM_SIGNER", "")
