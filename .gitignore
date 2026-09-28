@@ -44,3 +44,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Master specifications (Word). The Markdown versions in docs/ are the source
+# of truth referenced by the README; these are the original binaries, kept on
+# disk but out of the public repo.
+*.docx

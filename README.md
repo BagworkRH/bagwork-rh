@@ -122,3 +122,10 @@ claims can be authorized; token decimals are read from that row.
 
 > Development-only mocks are clearly marked (`apps/social/providers/mock.py`,
 > `RewardToken` contract) and are not wired into production paths.
+
+## License
+
+MIT © 2026 Isaac Chigozie. See [LICENSE](LICENSE).
+
+> The original Word specifications (`*.docx`) are kept out of the public repo;
+> [`docs/`](docs) holds the Markdown versions this README links to.
