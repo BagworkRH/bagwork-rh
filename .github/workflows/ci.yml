@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    # This repository's default branch is `master`.
-    branches: [master, develop]
+    # This repository's default branch is `main`.
+    branches: [main, develop]
   pull_request:
 
 jobs:
