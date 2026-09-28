@@ -16,6 +16,8 @@ Built from the five master specifications in [`/docs`](docs):
 | 03 | X Tracking & Reward Engine |
 | 04 | Blockchain & Wallet |
 | 05 | Deployment, Security & Agent Instructions |
+| 06 | Operations Runbook (hardening, backups, recovery) |
+| 07 | **Deployment Runbook — Robinhood Chain (testnet → mainnet)** |
 
 ## Repository layout
 
@@ -54,8 +56,12 @@ npm run dev                      # http://localhost:3000
 cd contracts/src/reward_token
 npm install
 npx hardhat test                 # unit tests for RewardDistributor
-npx hardhat run scripts/deploy.ts --network sepolia
+npx hardhat run scripts/deploy.ts --network robinhoodTestnet
 ```
+
+Full deployment procedure (funding, contract deploy, domain-separator
+verification, backend config, smoke test, mainnet repeat) is in
+[`docs/07_Deployment_Runbook.md`](docs/07_Deployment_Runbook.md).
 
 ## Blockchain configuration (Phase 6)
 
