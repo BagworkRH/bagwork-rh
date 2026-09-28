@@ -1,18 +1,17 @@
 /**
  * bagworkRH brand mark and wordmark (Spec 01 design direction).
  *
- * The mark is a token diamond with an upward arrow through it: "work -> reward".
- * It deliberately avoids a literal shopping bag, since "bag" is crypto slang for
- * holding a losing position.
+ * The mark is a set of rounded bars with the final one rising, reading as
+ * "work -> reward". It deliberately avoids a literal shopping bag, since "bag"
+ * is crypto slang for holding a losing position.
  *
  * Two rendering contexts, one source of truth:
  *   - `full` (header/footer): mark + wordmark
  *   - `mark` (favicons, OG images, docs): the glyph on its own
- * Colours mirror the CSS custom properties in `app/globals.css` so the logo
- * stays in sync with the theme.
+ *
+ * The glyph uses `currentColor` so it inherits the surrounding text colour and
+ * stays in sync with the theme tokens in `app/globals.css`.
  */
-import { useId } from "react";
-
 type BrandLogoProps = {
   variant?: "full" | "mark";
   /** Pixel size of the mark. The wordmark scales with it. */
@@ -20,12 +19,8 @@ type BrandLogoProps = {
   className?: string;
 };
 
-/** The glyph only, coloured by the theme. */
+/** The glyph only, coloured by the surrounding text. */
 export function BrandMark({ size = 28, className }: Omit<BrandLogoProps, "variant">) {
-  // Gradient ids must be unique: the header and footer both render a mark,
-  // and duplicate ids in one document make the second reference unpredictable.
-  const gradientId = useId();
-
   return (
     <svg
       className={className}
@@ -36,36 +31,20 @@ export function BrandMark({ size = 28, className }: Omit<BrandLogoProps, "varian
       aria-label="bagworkRH"
       focusable="false"
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f7cf4a" />
-          <stop offset="100%" stopColor="#f0b90b" />
-        </linearGradient>
-      </defs>
-      {/* Token diamond */}
-      <path
-        d="M32 3 61 32 32 61 3 32Z"
-        fill={`url(#${gradientId})`}
-        stroke="rgba(255,255,255,0.22)"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      {/* Facets, for depth at small sizes */}
-      <path d="M32 3 61 32 32 32Z" fill="rgba(255,255,255,0.18)" />
-      <path d="M32 3 3 32 32 32Z" fill="rgba(0,0,0,0.08)" />
-      {/* Upward arrow: the "work -> reward" beat */}
-      <path
-        d="M32 15.5 46 30.5h-7.5V48h-13V30.5H18Z"
-        fill="#0b0e14"
-        stroke="#0b0e14"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
+      {/* Bar mark, echoing the YAP glyph but with a rising final bar to read
+          as "work -> reward". Current-color so it inherits the header ink. */}
+      <g fill="currentColor">
+        <rect x="6" y="22" width="11" height="20" rx="5.5" />
+        <rect x="22" y="12" width="11" height="30" rx="5.5" />
+        <rect x="38" y="16" width="11" height="26" rx="5.5" opacity="0.65" />
+        <rect x="54" y="6" width="4" height="36" rx="2" />
+      </g>
     </svg>
   );
 }
 
-/** Mark + wordmark, with `RH` accented to signal the Robinhood Chain scope. */
+/** Mark + wordmark. The mark is `currentColor`, so the wordmark stays plain ink
+ *  and the `RH` suffix takes the highlight accent. */
 export default function BrandLogo({
   variant = "full",
   size = 28,

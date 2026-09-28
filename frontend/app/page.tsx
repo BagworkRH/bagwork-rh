@@ -42,11 +42,11 @@ export default function HomePage() {
   return (
     <>
       <section className="hero container">
-        <h1>Earn crypto rewards for verified social promotion</h1>
+        <h1>Post for a campaign. Get paid on-chain.</h1>
         <p>
-          Connect your X account and EVM wallet, join campaigns, publish
-          qualifying posts, and earn token rewards — with transparent
-          verification, on-chain claims, and full auditability.
+          Connect your X account and wallet, publish qualifying posts, and
+          earn verified token rewards. Every claim is EIP-712 signed and settled
+          on Robinhood Chain.
         </p>
         <div className="hero-ctas">
           <Link href="/dashboard" className="btn btn-primary">
@@ -61,8 +61,8 @@ export default function HomePage() {
       <section className="container section">
         <div className="stat-strip">
           <div className="stat-box">
-            <div className="num">$1.2M+</div>
-            <div className="muted">Rewards earned</div>
+            <div className="num money">$1.2M+</div>
+            <div className="muted">Rewards paid</div>
           </div>
           <div className="stat-box">
             <div className="num">8.4k</div>
@@ -74,7 +74,7 @@ export default function HomePage() {
           </div>
           <div className="stat-box">
             <div className="num">99.9%</div>
-            <div className="muted">Verification transparency</div>
+            <div className="muted">Verification rate</div>
           </div>
         </div>
       </section>

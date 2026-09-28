@@ -4,9 +4,9 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "bagworkRH — Earn crypto for verified social promotion",
+  title: "bagworkRH — Get paid for the posts you make",
   description:
-    "Connect your X account and EVM wallet, join campaigns, publish qualifying posts, and earn crypto rewards.",
+    "Post for a campaign, earn verified token rewards, claim on-chain. Connect your X account and wallet to get paid.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
