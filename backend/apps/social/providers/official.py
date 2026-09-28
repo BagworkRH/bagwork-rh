@@ -60,7 +60,9 @@ class OfficialXProvider(SocialProvider):
         request.session[self._session_key("verifier")] = code_verifier
         request.session[self._session_key("scopes")] = scopes
 
-        callback_url = request.build_absolute_uri(reverse("social:callback", kwargs={"platform": self.platform}))
+        callback_url = request.build_absolute_uri(
+            reverse("social:callback", kwargs={"platform": self.platform})
+        )
         params = {
             "response_type": "code",
             "client_id": client_id,
@@ -84,7 +86,9 @@ class OfficialXProvider(SocialProvider):
 
         from django.urls import reverse  # noqa: PLC0415
 
-        callback_url = request.build_absolute_uri(reverse("social:callback", kwargs={"platform": self.platform}))
+        callback_url = request.build_absolute_uri(
+            reverse("social:callback", kwargs={"platform": self.platform})
+        )
         token_resp = requests.post(
             "https://api.twitter.com/2/oauth2/token",
             data={

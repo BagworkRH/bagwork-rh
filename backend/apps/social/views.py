@@ -5,7 +5,6 @@ future network share one implementation. A seller may connect several platforms
 at once — they are independent accounts, not alternatives.
 """
 from django.http import Http404
-
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated

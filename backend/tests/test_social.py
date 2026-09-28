@@ -1,6 +1,7 @@
 """Social linking, post discovery and verification pipeline tests (Spec 03)."""
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -49,8 +50,6 @@ class SocialAccountLinkingTests(TestCase):
         self.assertEqual(tiktok.provider_user_id, "777")
 
     def test_seller_cannot_link_same_platform_twice(self):
-        from django.db import IntegrityError, transaction
-
         user, profile = make_user()
         SocialAccount.objects.create(
             seller=profile, platform=SocialPlatform.X, provider_user_id="1", username="a"
