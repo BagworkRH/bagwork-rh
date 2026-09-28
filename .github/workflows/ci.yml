@@ -33,6 +33,25 @@ jobs:
           DEBUG: "1"
         run: python manage.py check
 
+      - name: Hardening checks reject unsafe production settings
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          SECRET_KEY: "unsafe-default-key-change-me"
+          ALLOWED_HOSTS: "*"
+        run: |
+          # Deliberately unsafe production config: `check --deploy` MUST fail
+          # with the hardening.* ids. If it passes, the Phase 8 safety net is
+          # not wired up and a real deploy would boot with a placeholder key.
+          if python manage.py check --deploy --verbosity 2 > /tmp/check.txt 2>&1; then
+            echo "::error::hardening checks did not fail on unsafe production config"
+            cat /tmp/check.txt
+            exit 1
+          fi
+          grep -q "hardening.E001" /tmp/check.txt
+          grep -q "hardening.E002" /tmp/check.txt
+          grep -q "hardening.W001" /tmp/check.txt
+          echo "hardening checks correctly rejected unsafe production config"
+
       - name: Run tests
         env:
           DEBUG: "1"

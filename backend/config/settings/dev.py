@@ -7,7 +7,7 @@ can bootstrap without a running database.
 import os
 
 from .base import *  # noqa: F401,F403
-from .base import BASE_DIR  # noqa: F401
+from .base import BASE_DIR, REST_FRAMEWORK  # noqa: F401
 
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
@@ -26,3 +26,20 @@ else:
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
+# Development tolerance for rate limits: a generous per-hour budget so local
+# work and the test-suite never trip 429s. Production uses the strict
+# env-driven rates from base.py (THROTTLE_*). Individual scopes can still be
+# tightened via env vars if you want to exercise throttling locally.
+# A new dict is built (rather than mutating the imported one) so `base` keeps
+# its own untouched copy of the production rates.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.environ.get("THROTTLE_ANON", "100000/hour"),
+        "user": os.environ.get("THROTTLE_USER", "100000/hour"),
+        "auth": os.environ.get("THROTTLE_AUTH", "100000/hour"),
+        "admin": os.environ.get("THROTTLE_ADMIN", "100000/hour"),
+        "wallet": os.environ.get("THROTTLE_WALLET", "100000/hour"),
+    },
+}

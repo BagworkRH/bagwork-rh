@@ -35,7 +35,7 @@ python -m venv .venv
 pip install -r requirements/dev.txt
 copy .env.example .env           # fill in values (SQLite fallback works out of the box)
 python manage.py migrate
-python manage.py test tests      # 157 tests
+python manage.py test tests      # 171 tests
 python manage.py runserver       # http://localhost:8000/api/health/
 ```
 
@@ -96,9 +96,16 @@ claims can be authorized; token decimals are read from that row.
   (pause/disable/rotate), internal accounting ledger. Solidity
   `RewardDistributor` + `RewardToken` with Hardhat tests. Live testnet
   deployment (contract addresses/RPC) is the remaining integration step.
-- **Phase 7 — Admin:** 🔶 Django admin configured; admin API/UI tightening.
-- **Phase 8 — Hardening:** pending (rate limiting, monitoring, backups,
-  load testing, recovery procedures).
+- **Phase 7 — Admin:** ✅ staff back-office API (sellers, campaigns, post
+  review, reward review, claims, fraud/risk review queue), Django admin
+  configured, audited admin actions.
+- **Phase 8 — Hardening:** 🔶 rate limiting (path-scoped DRF throttles for
+  auth/admin/wallet surfaces + anonymous/authenticated baselines), monitoring
+  (Celery heartbeat, richer `/api/health/`, deployment system checks via
+  `manage.py check --deploy`), error tracking (Sentry, opt-in via
+  `SENTRY_DSN`), PostgreSQL backup/restore scripts, concurrency smoke-test
+  script, and an operations runbook in
+  [`docs/06_Operations.md`](docs/06_Operations.md).
 
 ## Security notes
 - OAuth credentials encrypted at rest (AES-256-GCM, key derived from

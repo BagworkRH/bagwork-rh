@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.wallets",
     "apps.blockchain",
     "apps.audit",
+    "apps.monitoring",
 ]
 
 MIDDLEWARE = [
@@ -129,12 +130,37 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    # Production hardening (Spec 05 Phase 8): global rate limiting.
+    # The scoped classes are path-selective (see `config/throttling.py`) and
+    # only throttle auth / admin / wallet surfaces; the baselines cover
+    # everything else. All rates are tunable via THROTTLE_* env vars.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "config.throttling.AdminThrottle",
+        "config.throttling.AuthThrottle",
+        "config.throttling.WalletThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.environ.get("THROTTLE_ANON", "100/hour"),
+        "user": os.environ.get("THROTTLE_USER", "1000/hour"),
+        "auth": os.environ.get("THROTTLE_AUTH", "10/hour"),
+        "admin": os.environ.get("THROTTLE_ADMIN", "120/hour"),
+        "wallet": os.environ.get("THROTTLE_WALLET", "30/hour"),
+    },
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
+
+# Error tracking (Spec 05 Phase 8). Strict no-op unless SENTRY_DSN is set;
+# `config/sentry.py` bootstraps the SDK from these values.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "")
+HEARTBEAT_STALE_SECONDS = int(os.environ.get("HEARTBEAT_STALE_SECONDS", "300"))
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
@@ -180,6 +206,11 @@ CELERY_BEAT_SCHEDULE = {
     "scan-risk-signals": {
         "task": "apps.social.tasks.flag_suspicious_activity",
         "schedule": timedelta(hours=1),
+    },
+    # Phase 8: worker/beat liveness heartbeat written every minute.
+    "monitoring-heartbeat": {
+        "task": "apps.monitoring.tasks.heartbeat",
+        "schedule": 60.0,
     },
 }
 
