@@ -28,14 +28,14 @@ def refresh_post_metrics(self, post_id):
     from .providers import get_provider  # noqa: PLC0415
 
     post = SocialPost.objects.get(pk=post_id)
-    account = post.x_account
+    account = post.account
     if account is None:
         return {"status": "no-x-account", "post": post_id}
 
     creds = json.loads(
         decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
     )
-    metrics = get_provider().get_metrics(creds["access_token"], post.external_post_id)
+    metrics = get_provider(post.platform).get_metrics(creds["access_token"], post.external_post_id)
 
     PostMetricSnapshot.objects.create(
         post=post,

@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.audit.models import AuditLog
 
-from .models import PostMetricSnapshot, PostVerificationStatus, SocialPost
+from .models import PostMetricSnapshot, PostVerificationStatus, SocialPlatform, SocialPost
 
 ALLOWED_METRIC_FIELDS = ("likes", "reposts", "replies", "quotes", "bookmarks")
 
@@ -29,11 +29,13 @@ REVIEW_REJECTION_STATUSES = (
 def create_post_from_provider(seller, campaign, payload, *, actor=None) -> SocialPost:
     """Create a post record in DISCOVERED state from provider data.
 
-    The payload is what X discovery returned, reduced to what we are allowed
-    to ingest. Duplicate external_post_id is rejected with a clear reason.
+    The payload is what the platform provider returned, reduced to what we are
+    allowed to ingest. `platform` is part of a post's identity: the same
+    external_post_id on two platforms is two different posts.
     """
+    platform = payload.get("platform", SocialPlatform.X)
     external_id = payload["post_id"].strip()
-    if SocialPost.objects.filter(external_post_id=external_id).exists():
+    if SocialPost.objects.filter(platform=platform, external_post_id=external_id).exists():
         return None  # duplicate; caller decides how to surface
 
     published_at = payload.get("created_at")
@@ -41,7 +43,10 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
         published_at = timezone.now()
 
     return SocialPost.objects.create(
-        x_account=seller.x_accounts.filter(status="CONNECTED").first(),
+        account=seller.social_accounts.filter(
+            platform=platform, status="CONNECTED"
+        ).first(),
+        platform=platform,
         external_post_id=external_id,
         seller=seller,
         campaign=campaign,

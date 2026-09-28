@@ -81,7 +81,7 @@ def seller_to_dict(profile) -> dict:
         "reputation_score": profile.reputation_score,
         "wallets": profile.wallets.count(),
         "verified_wallets": profile.wallets.filter(verified=True).count(),
-        "x_accounts": profile.x_accounts.count(),
+        "social_accounts": profile.social_accounts.count(),
         "posts": profile.posts.count(),
         "created_at": profile.created_at.isoformat(),
     }

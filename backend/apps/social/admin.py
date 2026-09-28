@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import PostMetricSnapshot, SocialPost, XAccount
+from .models import PostMetricSnapshot, SocialAccount, SocialPost
 
 
 @admin.action(description="Approve selected posts (mark VERIFIED)")
@@ -34,8 +34,8 @@ def flag_posts_suspicious(modeladmin, request, queryset):
     messages.warning(request, f"Flagged {queryset.count()} post(s) as suspicious.")
 
 
-@admin.register(XAccount)
-class XAccountAdmin(admin.ModelAdmin):
+@admin.register(SocialAccount)
+class SocialAccountAdmin(admin.ModelAdmin):
     list_display = (
         "username", "display_name", "provider_user_id", "seller",
         "status", "connected_at", "last_synced_at",

@@ -26,7 +26,7 @@ WALLET = "0x1111111111111111111111111111111111111111"
 
 def make_post(profile, campaign, external_id, **kwargs):
     defaults = {
-        "x_account": None,
+        "account": None,
         "external_post_id": external_id,
         "seller": profile,
         "campaign": campaign,

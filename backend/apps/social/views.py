@@ -1,64 +1,92 @@
-"""X connection API views (Spec 03)."""
+"""Social platform connection API (Spec 03).
+
+Platform-agnostic: every route takes a `platform` segment so X, TikTok and any
+future network share one implementation. A seller may connect several platforms
+at once — they are independent accounts, not alternatives.
+"""
+from django.http import Http404
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .providers import get_provider, is_mock
-from .providers.base import XProviderError
-from .services import disconnect_x_account, link_x_account
+from .models import SocialPlatform
+from .providers import available_platforms, get_provider, is_mock
+from .providers.base import SocialProviderError
+from .services import disconnect_social_account, link_social_account
 
-REQUIRED_SCOPES = ["tweet.read", "users.read"]
+# OAuth scopes per platform. Platforms differ; the mock accepts anything.
+REQUIRED_SCOPES = {
+    SocialPlatform.X: ["tweet.read", "users.read"],
+    SocialPlatform.TIKTOK: ["user.info.basic", "video.list"],
+}
+
+
+def _resolve_platform(platform: str) -> str:
+    """Validate the platform segment, 404 on unknown values."""
+    if platform not in dict(SocialPlatform.choices):
+        raise Http404(f"Unsupported platform: {platform}")
+    if platform not in available_platforms():
+        raise Http404(f"No adapter available for platform: {platform}")
+    return platform
+
+
+def _scopes_for(platform: str) -> list[str]:
+    return REQUIRED_SCOPES.get(platform, [])
+
+
+def _no_seller():
+    return Response(
+        {"detail": "Create a seller profile before connecting a social account."},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def x_connect(request):
-    """Begin OAuth authorization; return a redirect URL for the provider."""
+def connect(request, platform):
+    """Begin OAuth authorization for a platform; return its redirect URL."""
+    platform = _resolve_platform(platform)
     seller = getattr(request.user, "seller_profile", None)
     if seller is None:
-        return Response(
-            {"detail": "Create a seller profile before connecting X."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return _no_seller()
 
-    provider = get_provider(request.user)
     try:
-        authorize_url = provider.authorize(request, REQUIRED_SCOPES)
-    except XProviderError as exc:
+        provider = get_provider(platform, user=request.user)
+        authorize_url = provider.authorize(request, _scopes_for(platform))
+    except SocialProviderError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     return Response(
-        {"authorize_url": authorize_url, "mock": is_mock()},
+        {"platform": platform, "authorize_url": authorize_url, "mock": is_mock(platform)},
         status=status.HTTP_200_OK,
     )
 
 
 @api_view(["GET", "POST"])
-def x_callback(request):
-    """Handle the provider callback: verify state, exchange code, link account."""
+def callback(request, platform):
+    """Handle a provider callback: verify state, exchange code, link account."""
+    platform = _resolve_platform(platform)
     state = request.query_params.get("state") or request.data.get("state")
     code = request.query_params.get("code") or request.data.get("code")
 
     if not request.user.is_authenticated:
         return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
-    try:
-        seller = request.user.seller_profile
-    except Exception:
-        return Response(
-            {"detail": "Create a seller profile before connecting X."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    seller = getattr(request.user, "seller_profile", None)
+    if seller is None:
+        return _no_seller()
 
-    provider = get_provider(request.user)
     try:
+        provider = get_provider(platform, user=request.user)
         identity = provider.callback(request, state, code)
-    except XProviderError as exc:
+    except SocialProviderError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    account = link_x_account(seller, identity, actor=request.user)
+    account = link_social_account(seller, identity, platform=platform, actor=request.user)
     return Response(
         {
+            "platform": account.platform,
             "provider_user_id": account.provider_user_id,
             "username": account.username,
             "status": account.status,
@@ -69,16 +97,32 @@ def x_callback(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def x_disconnect(request):
-    """Disconnect the linked X account for the current seller."""
-    try:
-        seller = request.user.seller_profile
-    except Exception:
-        return Response({"detail": "No seller profile."}, status=status.HTTP_400_BAD_REQUEST)
-    account = seller.x_accounts.filter(status="CONNECTED").first()
+def disconnect(request, platform):
+    """Disconnect the seller's account on one platform."""
+    platform = _resolve_platform(platform)
+    seller = getattr(request.user, "seller_profile", None)
+    if seller is None:
+        return _no_seller()
+
+    account = seller.social_accounts.filter(platform=platform, status="CONNECTED").first()
     if not account:
         return Response(
-            {"detail": "No connected X account."}, status=status.HTTP_404_NOT_FOUND
+            {"detail": f"No connected {platform} account."}, status=status.HTTP_404_NOT_FOUND
         )
-    disconnect_x_account(seller, account, actor=request.user)
-    return Response({"detail": "X account disconnected."})
+    disconnect_social_account(seller, account, actor=request.user)
+    return Response({"platform": platform, "detail": "Account disconnected."})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def platforms(request):
+    """Which platforms this build can connect."""
+    return Response(
+        {
+            "platforms": [
+                {"id": p, "name": dict(SocialPlatform.choices).get(p, p)}
+                for p in available_platforms()
+            ],
+            "mock": is_mock(),
+        }
+    )

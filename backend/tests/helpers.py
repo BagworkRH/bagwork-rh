@@ -11,7 +11,7 @@ from apps.blockchain import signing
 from apps.blockchain.models import TokenConfig
 from apps.campaigns.models import Campaign, CampaignStatus, RewardModel
 from apps.sellers.models import SellerProfile
-from apps.social.models import PostVerificationStatus, SocialPost
+from apps.social.models import PostVerificationStatus, SocialPlatform, SocialPost
 from apps.wallets.models import Wallet
 
 User = get_user_model()
@@ -209,10 +209,13 @@ def make_verified_wallet(
     return wallet
 
 
-def make_verified_post(profile, campaign, external_id="123456789", text="#"):
+def make_verified_post(
+    profile, campaign, external_id="123456789", text="#", platform=SocialPlatform.X
+):
     """Create a post already in VERIFIED state."""
     post = SocialPost.objects.create(
-        x_account=None,
+        account=None,
+        platform=platform,
         external_post_id=external_id,
         seller=profile,
         campaign=campaign,

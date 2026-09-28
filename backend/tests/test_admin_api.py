@@ -66,7 +66,7 @@ def make_reward(  # noqa: PLR0913 - test helper with sensible defaults
         campaign_kwargs["slug"] = slug
     campaign = make_campaign(**campaign_kwargs)
     post = SocialPost.objects.create(
-        x_account=None,
+        account=None,
         external_post_id=external_id,
         seller=profile,
         campaign=campaign,

@@ -217,11 +217,21 @@ CELERY_BEAT_SCHEDULE = {
 # Frontend URL used for building callback links etc.
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
-# X provider: "official" (X API) or "mock" (development mock only).
-X_PROVIDER = os.environ.get("X_PROVIDER", "official")
+# Social platform providers (Spec 03).
+# SOCIAL_PROVIDER_MODE is "official" (each platform's real API) or "mock" (the
+# clearly-marked development mock, used for every platform). Credentials are
+# per-platform and read from the environment; none are ever hard-coded.
+SOCIAL_PROVIDER_MODE = os.environ.get("SOCIAL_PROVIDER_MODE", "official")
+
+# X (Twitter) — https://developer.x.com
 X_CLIENT_ID = os.environ.get("X_CLIENT_ID", "")
 X_CLIENT_SECRET = os.environ.get("X_CLIENT_SECRET", "")
 X_REDIRECT_URI = os.environ.get("X_REDIRECT_URI", "")
+
+# TikTok — https://developers.tiktok.com
+TIKTOK_CLIENT_KEY = os.environ.get("TIKTOK_CLIENT_KEY", "")
+TIKTOK_CLIENT_SECRET = os.environ.get("TIKTOK_CLIENT_SECRET", "")
+TIKTOK_REDIRECT_URI = os.environ.get("TIKTOK_REDIRECT_URI", "")
 
 # Blockchain (Spec 04)
 # RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and

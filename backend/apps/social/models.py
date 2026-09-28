@@ -1,4 +1,10 @@
-"""X integration models (Specs 02 & 03).
+"""Social platform integration models (Specs 02 & 03).
+
+The platform is deliberately not X-specific: a seller may link an account on
+any supported network, and a qualifying post may originate from any of them.
+`platform` is therefore part of every external identifier's identity — X and
+TikTok both issue numeric-looking post ids, so `(platform, external_id)` is
+the natural key rather than the id alone.
 
 OAuth credentials are stored encrypted at rest; raw tokens are never logged.
 """
@@ -8,11 +14,30 @@ from django.utils import timezone
 from apps.sellers.models import SellerProfile
 
 
-class XAccount(models.Model):
-    """A seller's linked X (Twitter) account."""
+class SocialPlatform(models.TextChoices):
+    """Supported social networks. A post's platform is always one of these."""
 
-    seller = models.ForeignKey(SellerProfile, on_delete=models.CASCADE, related_name="x_accounts")
-    provider_user_id = models.CharField(max_length=64, db_index=True, unique=True)
+    X = "x", "X (Twitter)"
+    TIKTOK = "tiktok", "TikTok"
+    INSTAGRAM = "instagram", "Instagram"
+    YOUTUBE = "youtube", "YouTube"
+
+
+class SocialAccount(models.Model):
+    """A seller's linked account on one social platform.
+
+    Renamed from `XAccount` when the platform layer was generalised. A seller
+    can have one row per platform; `provider_user_id` is unique *per platform*
+    because ids are only meaningful within their own network.
+    """
+
+    seller = models.ForeignKey(
+        SellerProfile, on_delete=models.CASCADE, related_name="social_accounts"
+    )
+    platform = models.CharField(
+        max_length=16, choices=SocialPlatform.choices, default=SocialPlatform.X, db_index=True
+    )
+    provider_user_id = models.CharField(max_length=64, db_index=True)
     username = models.CharField(max_length=64)
     display_name = models.CharField(max_length=128, blank=True)
     avatar_url = models.URLField(blank=True)
@@ -27,9 +52,19 @@ class XAccount(models.Model):
 
     class Meta:
         ordering = ["-connected_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform", "provider_user_id"],
+                name="social_account_unique_provider_user_per_platform",
+            ),
+            models.UniqueConstraint(
+                fields=["seller", "platform"],
+                name="social_account_one_per_platform_per_seller",
+            ),
+        ]
 
     def __str__(self):
-        return f"@{self.username} ({self.provider_user_id})"
+        return f"@{self.username} on {self.get_platform_display()} ({self.provider_user_id})"
 
 
 class PostVerificationStatus(models.TextChoices):
@@ -52,12 +87,17 @@ class PostVerificationStatus(models.TextChoices):
 
 
 class SocialPost(models.Model):
-    """A discovered qualifying post (Spec 02 & 03)."""
+    """A discovered qualifying post on any supported platform (Spec 02 & 03)."""
 
-    x_account = models.ForeignKey(
-        XAccount, on_delete=models.PROTECT, related_name="posts", null=True, blank=True
+    account = models.ForeignKey(
+        SocialAccount, on_delete=models.PROTECT, related_name="posts", null=True, blank=True
     )
-    external_post_id = models.CharField(max_length=64, db_index=True, unique=True)
+    platform = models.CharField(
+        max_length=16, choices=SocialPlatform.choices, default=SocialPlatform.X, db_index=True
+    )
+    # Unique *per platform*: X and TikTok both issue numeric ids, so the bare
+    # id is not a natural key on its own.
+    external_post_id = models.CharField(max_length=64, db_index=True)
     seller = models.ForeignKey(SellerProfile, on_delete=models.PROTECT, related_name="posts")
     campaign = models.ForeignKey(
         "campaigns.Campaign", on_delete=models.PROTECT, related_name="posts", null=True, blank=True
@@ -87,9 +127,15 @@ class SocialPost(models.Model):
 
     class Meta:
         ordering = ["-published_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform", "external_post_id"],
+                name="social_post_unique_external_id_per_platform",
+            ),
+        ]
 
     def __str__(self):
-        return f"Post {self.external_post_id} ({self.verification_status})"
+        return f"{self.get_platform_display()} post {self.external_post_id} ({self.verification_status})"
 
     def set_verification(self, status, reason=""):
         self.verification_status = status

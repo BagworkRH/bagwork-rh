@@ -1,4 +1,4 @@
-"""X linking, post discovery and verification pipeline tests (Spec 03)."""
+"""Social linking, post discovery and verification pipeline tests (Spec 03)."""
 from datetime import timedelta
 
 from django.test import TestCase
@@ -7,29 +7,58 @@ from django.utils import timezone
 from apps.social.models import (
     PostMetricSnapshot,
     PostVerificationStatus,
+    SocialAccount,
+    SocialPlatform,
     SocialPost,
-    XAccount,
 )
 from apps.social.post_services import create_post_from_provider, run_verification
 
 from .helpers import make_campaign, make_user
 
 
-class XAccountLinkingTests(TestCase):
+class SocialAccountLinkingTests(TestCase):
     def test_link_and_disconnect(self):
         user, profile = make_user()
-        xa = XAccount.objects.create(
+        account = SocialAccount.objects.create(
             seller=profile,
+            platform=SocialPlatform.X,
             provider_user_id="u-1",
             username="alice",
             display_name="Alice",
             status="CONNECTED",
         )
-        self.assertEqual(xa.seller, profile)
-        self.assertEqual(xa.status, "CONNECTED")
-        xa.status = "DISCONNECTED"
-        xa.save()
-        self.assertEqual(xa.status, "DISCONNECTED")
+        self.assertEqual(account.seller, profile)
+        self.assertEqual(account.status, "CONNECTED")
+        account.status = "DISCONNECTED"
+        account.save()
+        self.assertEqual(account.status, "DISCONNECTED")
+
+    def test_same_provider_id_coexists_across_platforms(self):
+        # X and TikTok both issue numeric ids, so identity must be scoped to
+        # the platform or linking one would silently overwrite the other.
+        user, profile = make_user()
+        SocialAccount.objects.create(
+            seller=profile, platform=SocialPlatform.X, provider_user_id="777",
+            username="alice",
+        )
+        tiktok = SocialAccount.objects.create(
+            seller=profile, platform=SocialPlatform.TIKTOK, provider_user_id="777",
+            username="alice",
+        )
+        self.assertEqual(SocialAccount.objects.filter(seller=profile).count(), 2)
+        self.assertEqual(tiktok.provider_user_id, "777")
+
+    def test_seller_cannot_link_same_platform_twice(self):
+        from django.db import IntegrityError, transaction
+
+        user, profile = make_user()
+        SocialAccount.objects.create(
+            seller=profile, platform=SocialPlatform.X, provider_user_id="1", username="a"
+        )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            SocialAccount.objects.create(
+                seller=profile, platform=SocialPlatform.X, provider_user_id="2", username="b"
+            )
 
 
 class PostDiscoveryTests(TestCase):
