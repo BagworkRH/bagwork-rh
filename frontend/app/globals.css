@@ -46,6 +46,22 @@ a:focus-visible, button:focus-visible {
   padding-top: 14px;
   padding-bottom: 14px;
 }
+/* bagworkRH logo ------------------------------------------------------- */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+}
+.brand-logo-mark { display: block; flex: none; }
+.brand-logo-text {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.brand-logo-rh { color: var(--accent); }
+
 .brand { font-weight: 700; font-size: 1.15rem; color: var(--text); white-space: nowrap; }
 .brand-mark { color: var(--accent); }
 .nav { display: flex; gap: 18px; flex: 1; }

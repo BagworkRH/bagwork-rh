@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BRAND_NAME, NAV_LINKS } from "@/lib/constants";
+import BrandLogo from "@/lib/brand";
+import { NAV_LINKS } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { shortenAddress } from "@/lib/constants";
@@ -15,8 +16,8 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="container header-inner">
-        <Link href="/" className="brand">
-          <span className="brand-mark">◆</span> {BRAND_NAME}
+        <Link href="/" className="brand" aria-label="bagworkRH home">
+          <BrandLogo size={28} />
         </Link>
 
         <nav className={`nav ${menuOpen ? "nav-open" : ""}`} aria-label="Primary">

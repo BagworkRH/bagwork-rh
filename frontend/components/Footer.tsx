@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BRAND_NAME } from "@/lib/constants";
+import BrandLogo from "@/lib/brand";
 
 export default function Footer() {
   return (
@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="container footer-grid">
         <div>
           <p className="brand">
-            <span className="brand-mark">◆</span> {BRAND_NAME}
+            <BrandLogo size={26} />
           </p>
           <p className="muted">
             Earn crypto rewards for verified social promotion.
@@ -38,7 +38,7 @@ export default function Footer() {
         </div>
       </div>
       <p className="container footer-legal muted">
-        © {new Date().getFullYear()} {BRAND_NAME}. Cryptocurrency rewards carry
+        © {new Date().getFullYear()} bagworkRH. Cryptocurrency rewards carry
         risk; nothing here is financial advice.
       </p>
     </footer>

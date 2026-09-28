@@ -1,4 +1,7 @@
-# bagworkRH
+<div align="center">
+  <img src="frontend/app/icon.svg" alt="bagworkRH" width="96" height="96" />
+  <h1>bagworkRH</h1>
+</div>
 
 A crypto-native platform inspired by the UsePaid workflow (original branding,
 UI, and implementation) that connects **sellers/creators — X accounts,
