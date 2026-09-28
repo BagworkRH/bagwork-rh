@@ -31,7 +31,9 @@ cache/
 typechain-types/
 coverage/
 broadcast/
-lib/
+# Scoped to the contracts tree: a bare `lib/` would also swallow frontend/lib/,
+# which holds the API client and brand components.
+contracts/**/lib/
 
 # IDE / OS
 .idea/
