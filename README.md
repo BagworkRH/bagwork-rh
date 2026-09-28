@@ -1,4 +1,4 @@
-# Crypto Social Rewards Platform
+# bagworkRH
 
 A crypto-native platform inspired by the UsePaid workflow (original branding,
 UI, and implementation) that connects **sellers/creators — X accounts,

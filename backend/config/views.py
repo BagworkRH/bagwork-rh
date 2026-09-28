@@ -66,7 +66,7 @@ def health(request):
             "database": "ok" if db_ok else "error",
             "redis": redis_state,
             "heartbeat": heartbeat_state,
-            "service": "crypto-social-rewards",
+            "service": "bagwork-rh",
             "checks": {
                 "database": "ok" if db_ok else "error",
                 "redis": redis_state,

@@ -44,7 +44,7 @@ describe("RewardDistributor", function () {
     chainId: bigint
   ): Promise<string> {
     const domain = {
-      name: "CryptoRewards",
+      name: "bagworkRH",
       version: "1",
       chainId: Number(chainId),
       verifyingContract: contractAddress,

@@ -1,5 +1,5 @@
 """
-Base Django settings for the Crypto Social Rewards Platform.
+Base Django settings for bagworkRH.
 
 Settings here are shared across environments. Environment-specific values are
 sourced from environment variables (see `.env.example`). Secrets must never be
@@ -98,7 +98,7 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASES = {
     "default": {
         "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.environ.get("DB_NAME", "crypto_rewards"),
+        "NAME": os.environ.get("DB_NAME", "bagwork_rh"),
         "USER": os.environ.get("DB_USER", "postgres"),
         "PASSWORD": os.environ.get("DB_PASSWORD", ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),

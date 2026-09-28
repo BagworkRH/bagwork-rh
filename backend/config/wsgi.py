@@ -1,4 +1,4 @@
-"""WSGI config for the Crypto Social Rewards Platform."""
+"""WSGI config for bagworkRH."""
 import os
 
 from django.core.wsgi import get_wsgi_application

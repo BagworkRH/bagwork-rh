@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostgreSQL backup for Crypto Social Rewards — Spec 05 Phase 8 (backups).
+# PostgreSQL backup for bagworkRH — Spec 05 Phase 8 (backups).
 #
 # Usage:
 #   ./scripts/backup_db.sh [output_dir]      # default: backend/backups
@@ -20,7 +20,7 @@ if [ -f "${PROJECT_DIR}/.env" ]; then
   set +a
 fi
 
-DB_NAME="${DB_NAME:-crypto_rewards}"
+DB_NAME="${DB_NAME:-bagwork_rh}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 DB_HOST="${DB_HOST:-localhost}"
@@ -36,7 +36,7 @@ mkdir -p "${OUT_DIR}"
 
 export PGPASSWORD="${DB_PASSWORD}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
-OUT_FILE="${OUT_DIR}/crypto_rewards_${STAMP}.dump"
+OUT_FILE="${OUT_DIR}/bagwork_rh_${STAMP}.dump"
 
 echo "Backing up '${DB_NAME}'@${DB_HOST}:${DB_PORT} -> ${OUT_FILE}"
 pg_dump \

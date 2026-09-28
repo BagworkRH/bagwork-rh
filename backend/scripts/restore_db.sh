@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PostgreSQL restore for Crypto Social Rewards — Spec 05 Phase 8 (recovery).
+# PostgreSQL restore for bagworkRH — Spec 05 Phase 8 (recovery).
 #
 # Usage:
-#   ./scripts/restore_db.sh /path/to/crypto_rewards_YYYYMMDD_HHMMSS.dump
+#   ./scripts/restore_db.sh /path/to/bagwork_rh_YYYYMMDD_HHMMSS.dump
 #
 # WARNING: this DROPS and recreates the target database contents. Run against
 # a disposable/staging database first and always verify the latest backup
@@ -26,7 +26,7 @@ if [ -f "${PROJECT_DIR}/.env" ]; then
   set +a
 fi
 
-DB_NAME="${DB_NAME:-crypto_rewards}"
+DB_NAME="${DB_NAME:-bagwork_rh}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 DB_HOST="${DB_HOST:-localhost}"

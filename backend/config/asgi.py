@@ -1,4 +1,4 @@
-"""ASGI config for the Crypto Social Rewards Platform."""
+"""ASGI config for bagworkRH."""
 import os
 
 from django.core.asgi import get_asgi_application

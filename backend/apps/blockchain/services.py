@@ -141,7 +141,7 @@ def get_claim_authorization_payload(claim) -> dict:
         "chain_id": claim.chain_id,
         "contract_address": settings.CONTRACT_ADDRESS,
         "signer_address": claim_signer_address(),
-        "domain": {"name": "CryptoRewards", "version": "1", "chainId": claim.chain_id},
+        "domain": {"name": "bagworkRH", "version": "1", "chainId": claim.chain_id},
         "function": abi.CLAIM_FUNCTION_SIGNATURE,
         "transaction": {
             "to": settings.CONTRACT_ADDRESS,

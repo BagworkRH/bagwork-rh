@@ -58,8 +58,8 @@ loudly instead of silently disabling a limit.
 
 ```bash
 cd backend
-./scripts/backup_db.sh                      # -> backups/crypto_rewards_*.dump
-./scripts/restore_db.sh backups/crypto_rewards_20260701_120000.dump
+./scripts/backup_db.sh                      # -> backups/bagwork_rh_*.dump
+./scripts/restore_db.sh backups/bagwork_rh_20260701_120000.dump
 ```
 
 - Custom-format dumps (`pg_dump --format=custom`) support selective restore.

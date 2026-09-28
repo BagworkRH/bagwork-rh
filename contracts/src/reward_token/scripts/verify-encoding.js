@@ -2,7 +2,24 @@
 // Emits the values the Python backend (EIP-712 signing + ABI encoding) must
 // reproduce, computed with the real ethers stack — the same library the
 // contract tests use. Usage: node _crosscheck.js > _crosscheck.json
+//
+// The domain name below MUST stay in sync with:
+//   - backend/apps/blockchain/signing.py  (DOMAIN_NAME)
+//   - backend/apps/blockchain/services.py (claim authorization "domain")
+//   - contracts/src/reward_token/contracts/RewardDistributor.sol (DOMAIN_SEPARATOR)
 const { ethers } = require("ethers");
+
+const DOMAIN_NAME = process.env.DOMAIN_NAME || "bagworkRH";
+
+/** Emit a long hex string as an implicitly-concatenated Python literal. */
+function pyHex(value, indent = "        ") {
+  const body = value.startsWith("0x") ? value : `0x${value}`;
+  const lines = [];
+  for (let i = 0; i < body.length; i += 64) {
+    lines.push(`${indent}"${body.slice(i, i + 64)}"`);
+  }
+  return `(\n${lines.join("\n")}\n    )`;
+}
 
 const FIXTURE = {
   chainId: 11155111,
@@ -23,7 +40,7 @@ async function main() {
   const iface = new ethers.Interface([`function ${CLAIM_SIGNATURE}`]);
 
   const domain = {
-    name: "CryptoRewards",
+    name: DOMAIN_NAME,
     version: "1",
     chainId: FIXTURE.chainId,
     verifyingContract: FIXTURE.contract,
@@ -59,6 +76,9 @@ async function main() {
     FIXTURE.deadline,
     signature,
   ]);
+  const domainSep = ethers.TypedDataEncoder.hashDomain(domain);
+  const structHash = ethers.TypedDataEncoder.hashStruct("Claim", types, value);
+  const digest = ethers.TypedDataEncoder.hash(domain, types, value);
 
   console.log(
     JSON.stringify(
@@ -72,9 +92,9 @@ async function main() {
         nonce: Number(FIXTURE.nonce),
         deadline: Number(FIXTURE.deadline),
         selector: iface.getFunction("claim").selector,
-        domain_separator: ethers.TypedDataEncoder.hashDomain(domain),
-        struct_hash: ethers.TypedDataEncoder.hashStruct("Claim", types, value),
-        digest: ethers.TypedDataEncoder.hash(domain, types, value),
+        domain_separator: domainSep,
+        struct_hash: structHash,
+        digest,
         signer_address: signer.address,
         signature,
         calldata,
@@ -83,6 +103,21 @@ async function main() {
       2
     )
   );
+
+  if (process.argv.includes("--python")) {
+    // Emit the CROSS_CHECK body for backend/tests/helpers.py verbatim so the
+    // long hex values are never re-chunked by hand.
+    console.log(
+      [
+        "    'domain_separator': " + JSON.stringify(domainSep) + ",",
+        "    'struct_hash': " + JSON.stringify(structHash) + ",",
+        "    'digest': " + JSON.stringify(digest) + ",",
+        "    'signer_address': " + JSON.stringify(signer.address) + ",",
+        "    'signature': " + pyHex(signature) + ",",
+        "    'calldata': " + pyHex(calldata) + ",",
+      ].join("\n")
+    );
+  }
 }
 
 main().catch((error) => {

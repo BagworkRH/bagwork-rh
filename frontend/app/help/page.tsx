@@ -1,4 +1,4 @@
-export const metadata = { title: "Help — CryptoRewards" };
+export const metadata = { title: "Help — bagworkRH" };
 
 const TOPICS = [
   {

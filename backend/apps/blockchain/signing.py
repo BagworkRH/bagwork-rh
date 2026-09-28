@@ -37,7 +37,7 @@ DOMAIN_TYPEHASH = HexBytes(
         b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
     )
 )
-DOMAIN_NAME = b"CryptoRewards"
+DOMAIN_NAME = b"bagworkRH"
 DOMAIN_VERSION = b"1"
 
 # ECDSA signature layout used by ethers / OpenZeppelin: r|s|v, 65 bytes, with

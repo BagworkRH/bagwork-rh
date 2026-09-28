@@ -1,11 +1,11 @@
 import Link from "next/link";
 
-export const metadata = { title: "How It Works — CryptoRewards" };
+export const metadata = { title: "How It Works — bagworkRH" };
 
 export default function HowItWorksPage() {
   return (
     <div className="container section" style={{ maxWidth: 760 }}>
-      <h1>How CryptoRewards works</h1>
+      <h1>How bagworkRH works</h1>
 
       <section className="card" style={{ marginBottom: 20 }}>
         <h2>For sellers</h2>

@@ -21,7 +21,7 @@ const STEPS = [
 
 const FAQ = [
   {
-    q: "What is CryptoRewards?",
+    q: "What is bagworkRH?",
     a: "A platform that connects sellers with crypto reward campaigns. Sellers publish qualifying posts for campaigns and earn tokens for verified performance.",
   },
   {

@@ -10,7 +10,7 @@ async function getCampaigns(): Promise<Campaign[]> {
   }
 }
 
-export const metadata = { title: "Campaigns — CryptoRewards" };
+export const metadata = { title: "Campaigns — bagworkRH" };
 
 export default async function CampaignsPage() {
   const campaigns = await getCampaigns();
