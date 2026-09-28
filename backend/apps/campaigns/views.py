@@ -10,6 +10,14 @@ from apps.rewards.exceptions import RewardEngineError
 from .models import Campaign, CampaignStatus
 from .serializers import CampaignSerializer
 from .services import join_campaign
+from .stats import platform_stats
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def platform_stats_view(request):
+    """Public headline figures for the landing page (aggregates only)."""
+    return Response(platform_stats())
 
 
 @api_view(["GET"])

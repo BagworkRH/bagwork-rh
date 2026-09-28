@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPlatformStats, type PlatformStats } from "@/lib/stats";
 
 const STEPS = [
   {
@@ -38,7 +39,49 @@ const FAQ = [
   },
 ];
 
-export default function HomePage() {
+/** Compact display form for a raw token amount, e.g. "1.2M", "840". */
+function formatAmount(raw: string): string {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return "0";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M+`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+/**
+ * Live platform figures. Returns null when the backend is unreachable or
+ * there is nothing to report yet — in that case the strip is hidden rather
+ * than showing invented numbers.
+ */
+function statCells(stats: PlatformStats | null) {
+  if (!stats) return null;
+  const hasData =
+    stats.claims_completed > 0 ||
+    stats.active_sellers > 0 ||
+    stats.campaigns_total > 0 ||
+    stats.posts_tracked > 0;
+  if (!hasData) return null;
+
+  const cells = [
+    { value: formatAmount(stats.rewards_paid_total), label: "Rewards paid", money: true },
+    { value: stats.claims_completed.toLocaleString("en-US"), label: "Claims completed", money: false },
+    { value: stats.active_sellers.toLocaleString("en-US"), label: "Active sellers", money: false },
+    { value: stats.campaigns_live.toLocaleString("en-US"), label: "Campaigns live", money: false },
+  ];
+  if (stats.verification_rate !== null) {
+    cells.push({
+      value: `${Math.round(stats.verification_rate * 100)}%`,
+      label: "Posts verified",
+      money: false,
+    });
+  }
+  return cells;
+}
+
+export default async function HomePage() {
+  const stats = await getPlatformStats();
+  const cells = statCells(stats);
+
   return (
     <>
       <section className="hero container">
@@ -58,26 +101,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="container section">
-        <div className="stat-strip">
-          <div className="stat-box">
-            <div className="num money">$1.2M+</div>
-            <div className="muted">Rewards paid</div>
+      {cells && (
+        <section className="container section">
+          <div className="stat-strip">
+            {cells.map((cell) => (
+              <div className="stat-box" key={cell.label}>
+                <div className={`num${cell.money ? " money" : ""}`}>{cell.value}</div>
+                <div className="muted">{cell.label}</div>
+              </div>
+            ))}
           </div>
-          <div className="stat-box">
-            <div className="num">8.4k</div>
-            <div className="muted">Active sellers</div>
-          </div>
-          <div className="stat-box">
-            <div className="num">240+</div>
-            <div className="muted">Campaigns live</div>
-          </div>
-          <div className="stat-box">
-            <div className="num">99.9%</div>
-            <div className="muted">Verification rate</div>
-          </div>
-        </div>
-      </section>
+          <p className="muted stat-note">
+            Live figures from the platform. Rewards are only counted once a
+            claim has been settled on-chain.
+          </p>
+        </section>
+      )}
 
       <section className="container section">
         <h2>How it works</h2>

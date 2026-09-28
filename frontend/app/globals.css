@@ -212,6 +212,8 @@ textarea:focus-visible, summary:focus-visible {
   color: var(--text);
 }
 .stat-box .muted { font-size: 0.875rem; }
+/* Provenance note under the live figures. */
+.stat-note { font-size: 0.8125rem; margin: 12px 0 0; }
 
 /* Campaign cards */
 .campaign-card { transition: border-color 0.15s ease; }

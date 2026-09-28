@@ -1,15 +1,17 @@
 """Development settings. DEBUG on, relaxed CORS, SQLite fallback for local work.
 
-Set `DEBUG=1`, `DB_ENGINE=...` in `.env` to control behaviour. When no
+`DEBUG` and `DB_ENGINE` are read from the environment so the DEBUG=False guard
+in dev-only management commands (e.g. `seed_demo`) actually works. When no
 PostgreSQL password is supplied the app falls back to SQLite so the project
 can bootstrap without a running database.
 """
 import os
 
 from .base import *  # noqa: F401,F403
-from .base import BASE_DIR, REST_FRAMEWORK  # noqa: F401
+from .base import BASE_DIR, REST_FRAMEWORK, _bool  # noqa: F401
 
-DEBUG = True
+# Defaults to on locally; set DEBUG=0 in the environment to disable.
+DEBUG = _bool("DEBUG", True)
 ALLOWED_HOSTS = ["*"]
 
 # Local CORS: allow the Next.js dev server.

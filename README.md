@@ -40,9 +40,17 @@ python -m venv .venv
 pip install -r requirements/dev.txt
 copy .env.example .env           # fill in values (SQLite fallback works out of the box)
 python manage.py migrate
-python manage.py test tests      # 171 tests
+python manage.py seed_demo       # optional: demo sellers/campaigns/posts
+python manage.py test tests      # 179 tests
 python manage.py runserver       # http://localhost:8000/api/health/
 ```
+
+`seed_demo` creates 4 campaigns, 6 sellers, 40 posts and rewards so the landing
+page shows real figures. Demo owner login: `demo-owner@example.com` /
+`demo-owner-pass-123`. It refuses to run when `DEBUG=False`. The landing-page
+numbers come from the public `GET /api/v1/campaigns/stats/` endpoint and are
+hidden entirely when that returns no data — the site never displays
+placeholders.
 
 ### Frontend
 ```bash
