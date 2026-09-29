@@ -9,7 +9,10 @@ Tasks:
 All provider work goes through the X provider adapter; transient errors use
 exponential backoff retry.
 """
+import json
+
 from celery import shared_task
+from django.utils import timezone
 
 from apps.rewards.exceptions import RewardEngineError
 from apps.social.models import (
@@ -141,16 +144,100 @@ def run_verification_on_post(self, post_id):
 
     Facts are refreshed from the platform first: a post whose originality or
     text has changed upstream must be judged on what the platform says, not on
-    what was recorded at submission time.
+    what was recorded at submission time. A discovered post already carries
+    provider-confirmed evidence, so a refresh is not re-run over it -- that
+    would overwrite a confirmed fact with a weaker one.
     """
     post = SocialPost.objects.get(pk=post_id)
     if post.verification_status == PostVerificationStatus.VERIFIED:
         return {"status": "already-verified", "post": post_id}
-    if post.account is not None:
+    already_confirmed = post.originality_evidence in (
+        OriginalityEvidence.PROVIDER_CONFIRMED,
+        OriginalityEvidence.PROVIDER_REJECTED,
+    )
+    if post.account is not None and not already_confirmed:
         refresh_post_facts(post_id)
         post.refresh_from_db()
     result = run_verification(post)
     return {"status": result.verification_status, "post": post_id}
+
+
+@shared_task
+def discover_posts_for_account(account_id, campaign_id):
+    """Poll one connected account for new posts in one campaign, idempotently.
+
+    Idempotency has two layers, because polling runs repeatedly by design:
+    the campaign's per-platform watermark limits the window we ask the provider
+    for, and `(platform, external_post_id)` uniqueness stops a second row if the
+    same post still arrives.
+    """
+    from apps.campaigns.models import Campaign, CampaignStatus  # noqa: PLC0415
+    from apps.social.models import SocialAccount  # noqa: PLC0415
+    from apps.social.post_services import create_post_from_provider  # noqa: PLC0415
+    from apps.social.providers import get_provider  # noqa: PLC0415
+    from apps.social.providers.base import SocialProviderError  # noqa: PLC0415
+
+    from .crypto_utils import decrypt_secret  # noqa: PLC0415
+
+    account = SocialAccount.objects.filter(pk=account_id).first()
+    campaign = Campaign.objects.filter(pk=campaign_id).first()
+    if account is None or campaign is None:
+        return {"status": "missing", "created": 0}
+    if account.status != "CONNECTED" or campaign.status != CampaignStatus.ACTIVE:
+        return {"status": "inactive", "created": 0}
+    if not account.encrypted_credentials:
+        return {"status": "no-credentials", "created": 0}
+
+    creds = json.loads(
+        decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
+    )
+    since = campaign.discovery_watermark(account.platform)
+    now = timezone.now()
+
+    try:
+        provider = get_provider(account.platform)
+        found = provider.discover_posts(
+            creds["access_token"], account.provider_user_id, campaign, since, now
+        )
+    except SocialProviderError as exc:
+        # Do NOT advance the watermark on failure: the posts we missed must be
+        # re-read next tick, or a transient outage silently loses real posts.
+        return {"status": "provider-error", "created": 0, "detail": str(exc)[:200]}
+
+    created = 0
+    for payload in found:
+        # `from_provider` tells create_post_from_provider that originality came
+        # from the platform's own record, not from anything a human typed.
+        post = create_post_from_provider(
+            account.seller, campaign, {**payload, "platform": account.platform, "from_provider": True}
+        )
+        if post is not None:
+            created += 1
+
+    campaign.set_discovery_watermark(account.platform, now)
+    return {"status": "ok", "created": created, "seen": len(found)}
+
+
+@shared_task
+def poll_active_campaigns():
+    """Fan out discovery across every active campaign and connected account.
+
+    Bounded per account by X's per-user limit (900 requests / 15 min), so a
+    moderate campaign set polls comfortably. A larger launch should shard this
+    rather than raise the interval.
+    """
+    from apps.campaigns.models import Campaign, CampaignStatus  # noqa: PLC0415
+    from apps.social.models import SocialAccount  # noqa: PLC0415
+
+    dispatched = 0
+    for campaign in Campaign.objects.filter(status=CampaignStatus.ACTIVE):
+        account_ids = SocialAccount.objects.filter(
+            status="CONNECTED"
+        ).values_list("id", flat=True)
+        for account_id in account_ids:
+            discover_posts_for_account.delay(account_id, campaign.pk)
+            dispatched += 1
+    return {"dispatched": dispatched}
 
 
 @shared_task

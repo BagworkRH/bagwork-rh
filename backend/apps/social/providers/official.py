@@ -7,9 +7,11 @@ with PKCE flow. Credentials always come from environment variables
 import base64
 import hashlib
 import secrets
+from datetime import timezone as dt_timezone
 from urllib.parse import urlencode
 
 import requests
+from django.utils import timezone
 
 from .base import SocialProvider, SocialProviderError
 
@@ -21,6 +23,19 @@ SESSION_PREFIX = "social_oauth"
 def _pkce_challenge(verifier: str) -> str:
     digest = hashlib.sha256(verifier.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def _rfc3339(value) -> str:
+    """Format a datetime as RFC 3339, which is what X's start_time/end_time want.
+
+    X's docs describe these as `date-time`; it rejects a bare date, so the
+    offset is always included explicitly.
+    """
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = timezone.make_aware(value, dt_timezone.utc)
+    return value.astimezone(dt_timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class OfficialXProvider(SocialProvider):
@@ -165,9 +180,59 @@ class OfficialXProvider(SocialProvider):
             "is_quote": "quoted" in ref_types,
         }
 
+    def _get_timeline(self, access_token, user_id, params):
+        """One page of the timeline.
+
+        A connected OAuth2 *user* token is required: the endpoint's security is
+        `[OAuth2UserToken: [tweet.read, users.read]]`. An app-only bearer cannot
+        read a user's timeline.
+        """
+        resp = requests.get(
+            f"https://api.x.com/2/users/{user_id}/timelines/reverse_chronological",
+            headers=self._headers(access_token),
+            params=params,
+            timeout=30,
+        )
+        if not resp.ok:
+            raise SocialProviderError(f"Timeline fetch failed: HTTP {resp.status_code}")
+        return resp.json()
+
     def discover_posts(self, access_token, username, campaign, since, until):
-        # Only lookup endpoints within the authorized grant may be used.
-        raise SocialProviderError("Post discovery requires a grant that this app does not have.")
+        """Discover the user's own posts within a campaign window.
+
+        X renamed this endpoint; it is now
+        `GET /2/users/:id/timelines/reverse_chronological` (API v2.168), not
+        `/2/users/:id/tweets`. It requires an OAuth 2.0 *user* token with
+        `tweet.read` + `users.read`; an app-only bearer cannot read a timeline.
+
+        `exclude=retweets,replies` keeps the result to the creator's own
+        original posts, which is exactly what this platform pays for. We still
+        read `referenced_tweets` rather than trusting that filter, because the
+        filter is an optimisation and originality is the thing we get paid on.
+
+        `since` is the high-water mark (last successful poll) so repeated calls
+        stay cheap and idempotent; the campaign window bounds the first call.
+        """
+        user_id = self._resolve_user_id(access_token, username)
+        start = since or campaign.start_at
+        params = {
+            "max_results": 100,  # documented maximum
+            "start_time": _rfc3339(start),
+            "end_time": _rfc3339(until or campaign.end_at),
+            "exclude": "retweets,replies",
+            "tweet.fields": (
+                "created_at,public_metrics,text,referenced_tweets,conversation_id"
+            ),
+        }
+        body = self._get_timeline(access_token, user_id, params)
+        return [self.normalize_post(tweet) for tweet in body.get("data") or []]
+
+    def _resolve_user_id(self, access_token, username=None):
+        """Resolve the numeric user id the timeline endpoint requires."""
+        if username and str(username).isdigit():
+            return str(username)
+        account = self.get_account(access_token)
+        return str(account["provider_user_id"])
 
     def get_metrics(self, access_token, post_id):
         post = self.get_post(access_token, post_id)

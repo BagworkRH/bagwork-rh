@@ -187,6 +187,15 @@ CELERY_TIMEZONE = "UTC"
 # when RPC_URL/CONTRACT_ADDRESS are unset, so the scheduler is safe to run
 # before testnet deployment.
 CELERY_BEAT_SCHEDULE = {
+    # Social discovery (Stage 3). Polls each connected account per active
+    # campaign. 5 minutes keeps a creator's reward within minutes of posting
+    # while staying well inside X's 900 req/15min per-user limit and TikTok's
+    # video.list page cap. Tied to the per-campaign watermark, so a tick that
+    # finds nothing new costs one request.
+    "poll-social-discovery": {
+        "task": "apps.social.tasks.poll_active_campaigns",
+        "schedule": timedelta(minutes=5),
+    },
     "poll-reward-claimed-events": {
         "task": "apps.blockchain.tasks.process_claim_events",
         "schedule": 120.0,  # every 2 minutes

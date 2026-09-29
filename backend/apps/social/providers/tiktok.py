@@ -14,6 +14,7 @@ Metrics are reported only when TikTok actually exposes them; a metric that is
 not available is omitted rather than reported as a fabricated zero.
 """
 import secrets
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import requests
@@ -29,6 +30,12 @@ API_BASE = "https://open.tiktokapis.com/v2"
 
 # Fields we request. Anything not returned is simply absent from the payload.
 VIDEO_FIELDS = "id,create_time,share_url,title,view_count,like_count,comment_count,share_count"
+# Discovery needs title + create_time + share_url; metrics are not needed here.
+VIDEO_LIST_FIELDS = "id,create_time,share_url,title"
+# Documented maximum page size for POST /v2/video/list/.
+VIDEO_PAGE_SIZE = 20
+# Cap pagination so a pathological account cannot loop the poller forever.
+MAX_DISCOVERY_PAGES = 5
 
 # TikTok metric name -> our canonical metric name.
 METRIC_MAP = {
@@ -37,6 +44,13 @@ METRIC_MAP = {
     "replies": "comment_count",
     "reposts": "share_count",
 }
+
+
+def _epoch_millis(value) -> int | None:
+    """Datetime -> UTC Unix milliseconds, the unit TikTok's cursor expects."""
+    if value is None:
+        return None
+    return int(value.timestamp() * 1000)
 
 
 class OfficialTikTokProvider(SocialProvider):
@@ -164,11 +178,78 @@ class OfficialTikTokProvider(SocialProvider):
         return videos[0] if videos else {}
 
     def discover_posts(self, access_token, username, campaign, since, until):
-        # The public Content Posting API exposes no user-post search endpoint;
-        # discovering posts is out of scope for this adapter.
-        raise SocialProviderError(
-            "TikTok post discovery is not available through this adapter."
+        """Discover the creator's own uploads within a campaign window.
+
+        Uses TikTok's `POST /v2/video/list/` (Display API), which returns the
+        authenticated user's public video posts newest-first and takes the
+        `video.list` scope our OAuth flow already requests. `cursor` is a UTC
+        Unix timestamp in milliseconds, so it doubles as the "posts before this"
+        watermark and repeated polls stay cheap.
+
+        A TikTok video is always the creator's own upload, so it is original by
+        construction -- there is no repost/quote analogue to check.
+        """
+        found = []
+        # `cursor` is exclusive: it fetches videos posted *before* the given
+        # timestamp, so the first page passes nothing and later pages use `until`.
+        cursor = _epoch_millis(until) if until else None
+        for _ in range(MAX_DISCOVERY_PAGES):
+            body = self._list_videos(access_token, cursor)
+            data = body.get("data") or {}
+            for video in data.get("videos") or []:
+                payload = self.normalize_video(video)
+                created = payload.get("created_at")
+                if since and created and created < since:
+                    # Videos arrive newest-first, so the rest are older too.
+                    return found
+                found.append(payload)
+            if not data.get("has_more"):
+                break
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+        return found
+
+    def _list_videos(self, access_token, cursor=None):
+        body = {"max_count": VIDEO_PAGE_SIZE}  # documented maximum is 20
+        if cursor:
+            body["cursor"] = cursor
+        resp = requests.post(
+            f"{API_BASE}/video/list/",
+            headers=self._headers(access_token),
+            params={"fields": VIDEO_LIST_FIELDS},
+            json=body,
+            timeout=30,
         )
+        if not resp.ok:
+            raise SocialProviderError(f"Video list failed: HTTP {resp.status_code}")
+        payload = resp.json()
+        error = payload.get("error") or {}
+        if error.get("code") not in ("ok", "", None):
+            raise SocialProviderError(f"Video list error: {error.get('code')}")
+        return payload
+
+    @staticmethod
+    def normalize_video(video) -> dict:
+        """Map a TikTok video object into our provider payload shape.
+
+        `create_time` is Unix seconds; `share_url` is the canonical link. A
+        TikTok video is the creator's own upload, so originality holds by
+        construction rather than by inference.
+        """
+        created = video.get("create_time")
+        created_at = (
+            datetime.fromtimestamp(int(created), tz=timezone.utc) if created else None
+        )
+        video_id = str(video.get("id", ""))
+        return {
+            "post_id": video_id,
+            "text": video.get("title") or video.get("video_description") or "",
+            "created_at": created_at,
+            "post_url": video.get("share_url") or f"https://www.tiktok.com/@i/video/{video_id}",
+            "is_repost": False,
+            "is_quote": False,
+        }
 
     def get_metrics(self, access_token, post_id):
         video = self.get_post(access_token, post_id)

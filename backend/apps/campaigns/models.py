@@ -1,6 +1,9 @@
 """Campaign and participation models (Spec 02)."""
+from datetime import timezone as dt_timezone
+
 from django.db import models
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.sellers.models import SellerProfile
 
@@ -45,6 +48,11 @@ class Campaign(models.Model):
     )
     # JSON requirements such as required hashtags, mentions, minimum followers.
     requirements_json = models.JSONField(default=dict, blank=True)
+    # High-water mark for discovery polling, per platform. Stored here rather
+    # than globally so a new campaign re-reads its whole window while an
+    # in-flight one only reads what is new. Polling with no watermark would
+    # re-scan history every tick and burn credits for nothing.
+    discovery_watermarks = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.PROTECT, related_name="campaigns"
     )
@@ -60,6 +68,23 @@ class Campaign(models.Model):
     def is_active_for_joining(self, at=None):
         at = at or timezone.now()
         return self.status == CampaignStatus.ACTIVE and self.start_at <= at <= self.end_at
+
+    def discovery_watermark(self, platform: str):
+        """When this campaign last polled `platform`; None on a first run."""
+        raw = (self.discovery_watermarks or {}).get(platform)
+        if not raw:
+            return None
+        parsed = parse_datetime(raw)
+        return parsed if parsed and timezone.is_aware(parsed) else None
+
+    def set_discovery_watermark(self, platform: str, when) -> None:
+        """Record the high-water mark after a successful poll."""
+        if when is None:
+            when = timezone.now()
+        marks = dict(self.discovery_watermarks or {})
+        marks[platform] = when.astimezone(dt_timezone.utc).isoformat()
+        self.discovery_watermarks = marks
+        self.save(update_fields=["discovery_watermarks", "updated_at"])
 
 
 class ParticipationStatus(models.TextChoices):

@@ -63,18 +63,33 @@ repost on each platform is rejected.
 
 
 
-## Stage 3 — Discovery, the actual product
+## Stage 3 — Discovery, the actual product  — DONE (unverified against a live API)
 
-Creators currently paste a URL into a test endpoint. `discover_posts` raises on
-both adapters. Without this, nothing is automatic.
+Creators previously pasted a URL into a test endpoint. `discover_posts` raised on
+both adapters. Discovery is now implemented for both platforms and scheduled.
 
-- [ ] Implement `discover_posts` for X (user timeline, within campaign window)
-- [ ] Decide TikTok's equivalent or drop TikTok from launch scope honestly
-- [ ] Celery beat schedule to poll connected accounts
-- [ ] Idempotency: polling must not create duplicate posts
+- [x] `discover_posts` for X via `GET /2/users/:id/timelines/reverse_chronological`
+      (X renamed this endpoint; the old `/2/users/:id/tweets` path is gone)
+- [x] `discover_posts` for TikTok via `POST /v2/video/list/`. It does exist —
+      the earlier "no equivalent" assumption was wrong
+- [x] Celery beat schedule every 5 minutes, per campaign x connected account
+- [x] Idempotency: per-campaign per-platform watermark + `(platform, id)` uniqueness
+- [x] A provider error does NOT advance the watermark, so a transient outage
+      cannot silently discard posts published during the gap
+- [x] 16 discovery tests
 
 **Done when:** a creator who links an account and posts gets the reward with no
 manual step.
+
+**Verified only against stubs.** Both adapters match the documented contract, not
+a live response. See Stage 2 — this is the code Stage 2 will exercise.
+
+**Known limits:**
+- One timeline page per poll (X `max_results=100`). A creator posting more than
+  100 posts between polls would need pagination; unlikely but unbounded.
+- TikTok pagination is capped at 5 pages x 20 videos per poll.
+- X rate limits are per-user (900/15min); sharding, not a longer interval, is
+  the answer at scale.
 
 ## Stage 4 — Campaign creation API
 

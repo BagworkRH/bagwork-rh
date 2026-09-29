@@ -7,6 +7,8 @@ Verification pipeline:
 Failure states: NOT_ELIGIBLE, DUPLICATE, OUTSIDE_CAMPAIGN_WINDOW,
 REQUIREMENT_MISSING, ACCOUNT_NOT_CONNECTED, PROVIDER_ERROR, SUSPICIOUS_ACTIVITY
 """
+from datetime import datetime as django_datetime
+
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
@@ -38,6 +40,12 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
     The payload is what the platform provider returned, reduced to what we are
     allowed to ingest. `platform` is part of a post's identity: the same
     external_post_id on two platforms is two different posts.
+
+    Originality provenance is decided here, once, so every ingestion path
+    (discovery poller, manual submit, admin) records it the same way. A payload
+    that came from a provider carries `is_repost`/`is_quote`; one that came from
+    a human form does not, and is left as SELF_REPORTED for the evidence gate to
+    refuse until a provider confirms it.
     """
     platform = payload.get("platform", SocialPlatform.X)
     external_id = payload["post_id"].strip()
@@ -46,7 +54,22 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
 
     published_at = payload.get("created_at")
     if isinstance(published_at, str):
-        published_at = timezone.now()
+        published_at = django_datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+    if published_at is None:
+        # A post without a publication time cannot be placed in a campaign
+        # window, so refuse it rather than inventing "now" and letting it
+        # verify against a window it may not belong to.
+        return None
+
+    is_repost = bool(payload.get("is_repost", False))
+    is_quote = bool(payload.get("is_quote", False))
+    evidence = payload.get("originality_evidence")
+    if evidence is None and payload.get("from_provider"):
+        evidence = (
+            OriginalityEvidence.PROVIDER_CONFIRMED
+            if not (is_repost or is_quote)
+            else OriginalityEvidence.PROVIDER_REJECTED
+        )
 
     return SocialPost.objects.create(
         account=seller.social_accounts.filter(
@@ -56,8 +79,9 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
         external_post_id=external_id,
         seller=seller,
         campaign=campaign,
-        is_repost=bool(payload.get("is_repost", False)),
-        is_quote=bool(payload.get("is_quote", False)),
+        is_repost=is_repost,
+        is_quote=is_quote,
+        originality_evidence=evidence or OriginalityEvidence.SELF_REPORTED,
         post_url=payload.get("post_url", f"https://x.com/status/{external_id}"),
         text_snapshot=payload.get("text", "")[:5000],
         published_at=published_at,

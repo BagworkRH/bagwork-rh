@@ -4,6 +4,8 @@ MARKED AS DEVELOPMENT MOCK (per Spec 05: clearly mark development mocks).
 This is NOT wired into production configuration. It exists so the social link
 flow can be developed and tested without live credentials for any platform.
 """
+from datetime import datetime as django_datetime
+
 from django.utils import timezone
 
 from .base import SocialProvider
@@ -18,9 +20,12 @@ class MockSocialProvider(SocialProvider):
 
     is_mock = True
 
-    def __init__(self, user, platform="x"):
+    def __init__(self, user, platform="x", discovered_posts=None):
         self._user = user
         self.platform = platform
+        # Discovery is exercised in tests, so the mock needs something to
+        # return. Defaults to empty, which is the honest "nothing new".
+        self._discovered = list(discovered_posts or [])
 
     def _suffix(self):
         # Distinct per platform so mock ids do not collide across platforms.
@@ -58,7 +63,32 @@ class MockSocialProvider(SocialProvider):
         }
 
     def discover_posts(self, access_token, username, campaign, since, until):
-        return []
+        """Return posts that fall inside the requested window.
+
+        Honors `since`/`until` so idempotency is testable, and marks originality
+        the same way a real adapter would, so the discovery path is exercised
+        end to end rather than short-circuiting at the mock.
+        """
+        found = []
+        for raw in self._discovered:
+            created = raw.get("created_at")
+            if isinstance(created, str):
+                created = django_datetime.fromisoformat(created)
+            if since and created and created < since:
+                continue
+            if until and created and created > until:
+                continue
+            found.append(
+                {
+                    "post_id": str(raw["post_id"]),
+                    "text": raw.get("text", ""),
+                    "created_at": created,
+                    "post_url": raw.get("post_url", ""),
+                    "is_repost": raw.get("is_repost", False),
+                    "is_quote": raw.get("is_quote", False),
+                }
+            )
+        return found
 
     def get_metrics(self, access_token, post_id):
         return {
