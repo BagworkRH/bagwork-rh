@@ -9,7 +9,7 @@ from apps.campaigns.models import Campaign
 from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.services import calculate_reward
 
-from .models import SocialPost
+from .models import SocialPlatform, SocialPost
 from .post_services import create_post_from_provider, run_verification
 
 
@@ -17,6 +17,7 @@ def _post_payload(post):
     snap = post.metric_snapshots.order_by("-collected_at").first()
     return {
         "id": post.pk,
+        "platform": post.platform,
         "external_post_id": post.external_post_id,
         "post_url": post.post_url,
         "campaign": post.campaign.slug if post.campaign else None,
@@ -24,6 +25,7 @@ def _post_payload(post):
         "published_at": post.published_at.isoformat() if post.published_at else None,
         "verification_status": post.verification_status,
         "rejection_reason": post.rejection_reason,
+        "is_original": post.is_original,
         "impressions": snap.impressions if snap else post.impressions,
         "likes": snap.likes if snap else post.likes,
         "reposts": snap.reposts if snap else post.reposts,
@@ -56,13 +58,44 @@ def post_detail(request, pk):
     return Response(_post_payload(post))
 
 
+def _submission_payload(data):
+    """Build the provider payload for a submitted post.
+
+    A post's identity is (platform, external_post_id). X and TikTok both issue
+    numeric ids, so the platform must be part of the request or a legitimate
+    post would be rejected as a duplicate of an unrelated one. Returns an error
+    Response when the platform is unknown or the post id is missing.
+    """
+    platform = data.get("platform", SocialPlatform.X)
+    if platform not in dict(SocialPlatform.choices):
+        return Response(
+            {"detail": f"Unknown platform: {platform}."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    post_id = str(data.get("external_post_id", "")).strip()
+    if not post_id:
+        return Response(
+            {"detail": "external_post_id is required."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    return {
+        "post_id": post_id,
+        "text": data.get("text", ""),
+        "created_at": data.get("published_at") or None,
+        "post_url": data.get("post_url", ""),
+        "platform": platform,
+    }
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def post_submit(request):
-    """Submit a post URL for tracking (seller-only for their own posts).
+    """Submit a post for tracking (seller-only, for their own posts).
 
-    In production the provider discovery flow feeds this service; the manual
-    submit endpoint exists for testing the pipeline end-to-end.
+    The text, publication time and originality recorded here are SELF-REPORTED
+    and are not trusted for payout. The platform's own record wins:
+    `refresh_post_facts` re-fetches the post and overwrites these fields before
+    verification, so a repost submitted with original-sounding text does not
+    earn. In production the provider discovery flow feeds this service
+    directly; this endpoint exists for testing the pipeline end-to-end.
     """
     try:
         seller = request.user.seller_profile
@@ -76,16 +109,13 @@ def post_submit(request):
     if campaign is None:
         return Response({"detail": "Unknown campaign."}, status=status.HTTP_404_NOT_FOUND)
 
-    payload = {
-        "post_id": str(request.data.get("external_post_id", "")).strip(),
-        "text": request.data.get("text", ""),
-        "created_at": request.data.get("published_at") or None,
-        "post_url": request.data.get("post_url", ""),
-    }
-    if not payload["post_id"]:
-        return Response({"detail": "external_post_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+    payload = _submission_payload(request.data)
+    if isinstance(payload, Response):
+        return payload  # validation failed
 
-    existing = SocialPost.objects.filter(external_post_id=payload["post_id"]).first()
+    existing = SocialPost.objects.filter(
+        platform=payload["platform"], external_post_id=payload["post_id"]
+    ).first()
     if existing:
         return Response(
             {"detail": "Duplicate post; already tracked.", "post": _post_payload(existing)},

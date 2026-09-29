@@ -7,6 +7,8 @@ and is clearly marked as a development mock (Spec 05).
 Keeping this registry the *only* entry point is what makes the platform layer
 swappable: views, services and tasks never import a concrete adapter.
 """
+import importlib
+
 from django.conf import settings
 
 from .base import SocialProviderError
@@ -56,5 +58,7 @@ def get_provider(platform: str = "x", user=None):
         )
 
     module_path, class_name = path.split(":")
-    module = __import__(module_path, fromlist=[class_name])
+    # Registry paths are relative to this package, so a leading-dot import is
+    # not usable here; resolve against the package name explicitly.
+    module = importlib.import_module(f"{__package__}{module_path}")
     return getattr(module, class_name)(user)

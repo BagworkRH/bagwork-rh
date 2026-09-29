@@ -55,6 +55,19 @@ class ProviderRegistryTests(TestCase):
             for platform in available_platforms():
                 self.assertEqual(get_provider(platform).platform, platform)
 
+    def test_official_mode_resolves_each_registered_adapter(self):
+        # Regression: the registry used __import__(".official"), which cannot
+        # resolve a leading-dot module, so every official-mode lookup raised
+        # ModuleNotFoundError. Mock mode hid it because it imports directly.
+        with override_settings(SOCIAL_PROVIDER_MODE="official"):
+            for platform, cls in (
+                ("x", OfficialXProvider),
+                ("tiktok", OfficialTikTokProvider),
+            ):
+                provider = get_provider(platform)
+                self.assertIsInstance(provider, cls)
+                self.assertEqual(provider.platform, platform)
+
     def test_legacy_x_provider_setting_still_works(self):
         # Backwards compatibility: X_PROVIDER=mock predates SOCIAL_PROVIDER_MODE.
         with override_settings(SOCIAL_PROVIDER_MODE="", X_PROVIDER="mock"):

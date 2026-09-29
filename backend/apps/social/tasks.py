@@ -57,11 +57,71 @@ def refresh_post_metrics(self, post_id):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def refresh_post_facts(self, post_id):
+    """Re-fetch a post from its provider and overwrite the self-reported facts.
+
+    Originality and text must come from the platform, not from whatever the
+    seller typed into the submit form. Without this, a repost submitted with
+    original-sounding text would verify and earn. Idempotent, and a no-op when
+    the seller has no connected account to query.
+    """
+    from apps.social.providers import get_provider  # noqa: PLC0415
+
+    post = SocialPost.objects.get(pk=post_id)
+    account = post.account
+    if account is None or not account.encrypted_credentials:
+        return {"status": "no-connected-account", "post": post_id}
+
+    import json  # noqa: PLC0415
+
+    from .crypto_utils import decrypt_secret  # noqa: PLC0415
+
+    creds = json.loads(
+        decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
+    )
+    provider = get_provider(post.platform, user=None)
+    raw = provider.get_post(creds["access_token"], post.external_post_id)
+    if not raw:
+        # The platform no longer returns the post. Do not silently keep the
+        # seller's claim; flag it for review.
+        post.set_verification(
+            PostVerificationStatus.PROVIDER_ERROR,
+            "Post could not be retrieved from the platform.",
+        )
+        return {"status": "not-found", "post": post_id}
+
+    facts = getattr(provider, "normalize_post", None)
+    payload = facts(raw) if callable(facts) else raw
+
+    changed = []
+    if payload.get("is_repost") is not None and payload["is_repost"] != post.is_repost:
+        post.is_repost = bool(payload["is_repost"])
+        changed.append("is_repost")
+    if payload.get("is_quote") is not None and payload["is_quote"] != post.is_quote:
+        post.is_quote = bool(payload["is_quote"])
+        changed.append("is_quote")
+    if payload.get("text") is not None and payload["text"] != post.text_snapshot:
+        post.text_snapshot = payload["text"][:5000]
+        changed.append("text_snapshot")
+    if changed:
+        post.save(update_fields=[*changed, "updated_at"])
+    return {"status": "ok", "post": post_id, "updated": changed}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def run_verification_on_post(self, post_id):
-    """Advance a post through the verification pipeline (idempotent)."""
+    """Advance a post through the verification pipeline (idempotent).
+
+    Facts are refreshed from the platform first: a post whose originality or
+    text has changed upstream must be judged on what the platform says, not on
+    what was recorded at submission time.
+    """
     post = SocialPost.objects.get(pk=post_id)
     if post.verification_status == PostVerificationStatus.VERIFIED:
         return {"status": "already-verified", "post": post_id}
+    if post.account is not None:
+        refresh_post_facts(post_id)
+        post.refresh_from_db()
     result = run_verification(post)
     return {"status": result.verification_status, "post": post_id}
 
