@@ -107,6 +107,10 @@ class Command(BaseCommand):
                     "remaining_budget": Decimal(budget),
                     "reward_rate": Decimal(rate),
                     "reward_model": RewardModel.FIXED,
+                    # Rewards are paid for original, disclosed posts. The demo
+                    # campaign requires a disclosure so seeded posts show a
+                    # mix of disclosed and non-disclosed submissions.
+                    "requirements_json": {"required_disclosure": ["#ad"]},
                     "created_by": staff,
                     "status": CampaignStatus.ACTIVE,
                     "start_at": timezone.now() - timedelta(days=7),

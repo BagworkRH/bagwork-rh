@@ -46,8 +46,18 @@ Inputs: campaign, post, metric snapshot, seller, current budget, seller reward
 history. Output: gross reward, deductions/exclusions, final reward,
 calculation version, explanation. Every reward reproducible.
 
-Models: Fixed (`$5/post`), Impression-based (`$2 per 1k`), Engagement-based
-(`$0.50 per 100`), Hybrid (fixed + metric component). Always enforce caps.
+**Launch model: fixed per verified original post** (e.g. $5/post). Rewards are
+paid for a creator producing original, disclosed content — not for reach.
+Impression-based ($2 per 1k), engagement-based ($0.50 per 100) and hybrid
+calculations still exist in the engine but are **not selectable via the API**:
+those pay for metrics we cannot independently verify, which would undercut the
+platform's auditability. Re-enabling them is a deliberate later decision.
+
+Originality gate: reposts and quotes never earn. X reports this through
+`referenced_tweets`, mapped to `is_repost` / `is_quote`; a post is original
+when both are false. A reply is the creator's own words and still counts.
+
+Always enforce caps.
 
 ## Anti-fraud
 Signals: abnormal engagement spikes, repeated/duplicate posts, excessive

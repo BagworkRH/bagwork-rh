@@ -1,7 +1,7 @@
 """Campaign API serializers (Spec 02)."""
 from rest_framework import serializers
 
-from .models import Campaign, CampaignParticipation
+from .models import Campaign, CampaignParticipation, RewardModel
 
 
 class CampaignSerializer(serializers.ModelSerializer):
@@ -32,6 +32,33 @@ class CampaignSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("status", "remaining_budget", "created_at")
+
+    def validate_reward_model(self, value):
+        """Only fixed-per-verified-original-post is offered at launch.
+
+        The engine can still compute impression- and engagement-based rewards,
+        but they are not selectable: those models pay for reach we cannot
+        verify, which would undercut the auditability the platform is built on.
+        Re-enabling them is a deliberate, later decision.
+        """
+        if value != RewardModel.FIXED:
+            raise serializers.ValidationError(
+                "Only FIXED (a fixed reward per verified original post) is available "
+                "at launch. Rewards are paid for original, disclosed posts, not for "
+                "impressions or engagement, because those cannot be independently "
+                "verified on every platform."
+            )
+        return value
+
+    def validate(self, attrs):
+        """A fixed reward model needs a positive fixed rate."""
+        model = attrs.get("reward_model") or getattr(self.instance, "reward_model", None)
+        rate = attrs.get("reward_rate", getattr(self.instance, "reward_rate", None))
+        if model == RewardModel.FIXED and (rate is None or rate <= 0):
+            raise serializers.ValidationError(
+                {"reward_rate": "A fixed reward per post must be greater than zero."}
+            )
+        return attrs
 
     def get_joined(self, obj):
         request = self.context.get("request")

@@ -50,6 +50,8 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
         external_post_id=external_id,
         seller=seller,
         campaign=campaign,
+        is_repost=bool(payload.get("is_repost", False)),
+        is_quote=bool(payload.get("is_quote", False)),
         post_url=payload.get("post_url", f"https://x.com/status/{external_id}"),
         text_snapshot=payload.get("text", "")[:5000],
         published_at=published_at,
@@ -78,6 +80,33 @@ def run_verification(post, *, snapshot=None, actor=None) -> SocialPost:
         return post
 
     req = campaign.requirements_json or {}
+
+    # Originality gate. We pay for a creator producing content, not for
+    # amplifying someone else's, so a repost or quote never earns. Campaigns
+    # may opt out via `allow_non_original` for research/measurement, but the
+    # default is that only original posts are eligible.
+    if not post.is_original and not req.get("allow_non_original", False):
+        kind = "repost" if post.is_repost else "quote"
+        post.set_verification(
+            PostVerificationStatus.NOT_ORIGINAL,
+            f"Post is a {kind}, not original content; not eligible for a reward.",
+        )
+        return post
+
+    # Disclosure gate. Creators are paid for disclosed posts; an undisclosed
+    # post is both a compliance problem and grounds for reversal.
+    required_disclosure = req.get("required_disclosure", [])
+    text = post.text_snapshot or ""
+    if required_disclosure:
+        missing_disclosure = [
+            d for d in required_disclosure if d.lower() not in text.lower()
+        ]
+        if missing_disclosure:
+            post.set_verification(
+                PostVerificationStatus.NOT_DISCLOSED,
+                f"Missing required disclosure: {', '.join(missing_disclosure)}",
+            )
+            return post
 
     # Requirement check: text must contain required hashtags/mentions.
     text = post.text_snapshot or ""

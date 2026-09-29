@@ -133,13 +133,37 @@ class OfficialXProvider(SocialProvider):
 
     def get_post(self, access_token, post_id):
         resp = requests.get(
-            f"https://api.twitter.com/2/tweets/{post_id}?tweet.fields=created_at,public_metrics,text",
+            "https://api.twitter.com/2/tweets/"
+            f"{post_id}?tweet.fields=created_at,public_metrics,text,referenced_tweets",
             headers=self._headers(access_token),
             timeout=30,
         )
         if not resp.ok:
             raise SocialProviderError(f"Post fetch failed: HTTP {resp.status_code}")
         return resp.json()["data"]
+
+    @staticmethod
+    def normalize_post(raw) -> dict:
+        """Map an X API tweet into our provider payload shape.
+
+        `referenced_tweets` is how X marks a repost or a quote; without it we
+        cannot tell a creator's own post from amplification of someone else's,
+        which is the difference between earning a reward and not.
+        """
+        refs = raw.get("referenced_tweets") or []
+        ref_types = {ref.get("type") for ref in refs}
+        created_at = raw.get("created_at")
+        if created_at:
+            # X returns ISO-8601 with a trailing Z; make it explicit.
+            created_at = created_at.replace("Z", "+00:00")
+        return {
+            "post_id": str(raw.get("id", "")),
+            "text": raw.get("text", ""),
+            "created_at": created_at,
+            "post_url": f"https://x.com/i/status/{raw.get('id', '')}",
+            "is_repost": "reposted" in ref_types,
+            "is_quote": "quoted" in ref_types,
+        }
 
     def discover_posts(self, access_token, username, campaign, since, until):
         # Only lookup endpoints within the authorized grant may be used.

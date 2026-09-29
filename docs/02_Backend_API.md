@@ -30,17 +30,33 @@ Key points:
 
 ## Key endpoints
 `/api/v1/auth/register|login|logout/`, `/api/v1/me/`, `/me/seller/`,
-`/me/wallets/`, `/me/rewards/`, `/me/claims/`; `/api/v1/x/connect|callback|disconnect/`;
+`/me/wallets/`, `/me/rewards/`, `/me/claims/`;
+`/api/v1/x/<platform>/connect|callback|disconnect/`, `/x/platforms/`;
 `/api/v1/campaigns/`, `/campaigns/{slug}/`, `/campaigns/{id}/join/`;
 `/api/v1/posts/`, `/posts/{id}/`, `/posts/submit/`;
 `/api/v1/rewards/`, `/rewards/{id}/`; `/api/v1/claims/`, `/claims/{id}/`.
 
 ## Reward calculation
-Server determines reward from campaign rules, verified post status, eligible
-metrics, caps, remaining budget, seller limits, fraud/risk status.
-Example: `reward = eligible_impressions / 1000 * campaign_rate`, then apply
+Server determines reward from campaign rules, verified post status, caps,
+remaining budget, seller limits, fraud/risk status.
+
+**Fixed per verified original post.** `reward = campaign.reward_rate`, then apply
 per-post cap, per-seller cap, campaign remaining budget, duplicate prevention,
-invalid/fraudulent activity exclusions.
+and invalid/fraudulent activity exclusions.
+
+Impression-, engagement-, and hybrid-based models still exist in the engine but
+are **not selectable at launch**. They pay for reach that cannot be
+independently verified on every platform (X does not expose impression counts
+for other people's posts), which would undercut the auditability guarantee.
+
+Because the reward is per post rather than per reach, these are eligibility
+gates rather than calculation inputs — a post earns nothing unless it is:
+- **original** (not a repost or quote; X reports this via `referenced_tweets`)
+- **disclosed**, when the campaign sets `required_disclosure`
+- **in-window** and satisfying the campaign's other requirements
+
+Campaigns may set `allow_non_original: true` for research/measurement; the
+default is off.
 
 ## Money precision
 - No floats in financial math.

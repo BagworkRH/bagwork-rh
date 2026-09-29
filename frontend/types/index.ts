@@ -30,6 +30,9 @@ export interface Wallet {
 }
 
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "ENDED" | "CANCELLED";
+// The backend engine can still compute impression/engagement/hybrid rewards,
+// but they are not selectable at launch: rewards are paid per verified original
+// post. See docs/02_Backend_API.md.
 export type RewardModel = "FIXED" | "IMPRESSION_BASED" | "ENGAGEMENT_BASED" | "HYBRID";
 
 export interface Campaign {

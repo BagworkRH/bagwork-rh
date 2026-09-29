@@ -81,6 +81,10 @@ class PostVerificationStatus(models.TextChoices):
     DUPLICATE = "DUPLICATE", "Duplicate"
     OUTSIDE_CAMPAIGN_WINDOW = "OUTSIDE_CAMPAIGN_WINDOW", "Outside campaign window"
     REQUIREMENT_MISSING = "REQUIREMENT_MISSING", "Requirement missing"
+    # Rewards are paid per original post. Amplifying someone else's content
+    # earns nothing, so reposts and quotes are rejected rather than paid for.
+    NOT_ORIGINAL = "NOT_ORIGINAL", "Not original (repost or quote)"
+    NOT_DISCLOSED = "NOT_DISCLOSED", "Required disclosure missing"
     ACCOUNT_NOT_CONNECTED = "ACCOUNT_NOT_CONNECTED", "Account not connected"
     PROVIDER_ERROR = "PROVIDER_ERROR", "Provider error"
     SUSPICIOUS_ACTIVITY = "SUSPICIOUS_ACTIVITY", "Suspicious activity"
@@ -106,6 +110,15 @@ class SocialPost(models.Model):
     text_snapshot = models.TextField(blank=True)
     published_at = models.DateTimeField()
     discovered_at = models.DateTimeField(default=timezone.now)
+
+    # Originality. Rewards are paid per *original* post, so a repost or a
+    # quote must be distinguishable from a creator's own work. Set from the
+    # provider's `referenced_tweets` where the platform exposes it; where it
+    # does not, a post is original by construction (e.g. a TikTok video is
+    # always the creator's own upload).
+    is_repost = models.BooleanField(default=False)
+    is_quote = models.BooleanField(default=False)
+
     verification_status = models.CharField(
         max_length=32,
         choices=PostVerificationStatus.choices,
@@ -136,6 +149,15 @@ class SocialPost(models.Model):
 
     def __str__(self):
         return f"{self.get_platform_display()} post {self.external_post_id} ({self.verification_status})"
+
+    @property
+    def is_original(self) -> bool:
+        """True when this is the creator's own post, not a repost or quote.
+
+        This is the basis of the fixed-reward model: we pay for a creator
+        producing something, not for amplifying someone else's.
+        """
+        return not (self.is_repost or self.is_quote)
 
     def set_verification(self, status, reason=""):
         self.verification_status = status
