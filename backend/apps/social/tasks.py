@@ -12,7 +12,11 @@ exponential backoff retry.
 from celery import shared_task
 
 from apps.rewards.exceptions import RewardEngineError
-from apps.social.models import PostVerificationStatus, SocialPost
+from apps.social.models import (
+    OriginalityEvidence,
+    PostVerificationStatus,
+    SocialPost,
+)
 from apps.social.post_services import run_verification
 
 
@@ -66,10 +70,14 @@ def refresh_post_facts(self, post_id):
     the seller has no connected account to query.
     """
     from apps.social.providers import get_provider  # noqa: PLC0415
+    from apps.social.providers.base import SocialProviderError  # noqa: PLC0415
 
     post = SocialPost.objects.get(pk=post_id)
     account = post.account
     if account is None or not account.encrypted_credentials:
+        # No way to check. Do not leave the post looking self-reported-and-fine.
+        post.originality_evidence = OriginalityEvidence.PROVIDER_UNAVAILABLE
+        post.save(update_fields=["originality_evidence", "updated_at"])
         return {"status": "no-connected-account", "post": post_id}
 
     import json  # noqa: PLC0415
@@ -80,10 +88,19 @@ def refresh_post_facts(self, post_id):
         decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
     )
     provider = get_provider(post.platform, user=None)
-    raw = provider.get_post(creds["access_token"], post.external_post_id)
+    try:
+        raw = provider.get_post(creds["access_token"], post.external_post_id)
+    except SocialProviderError as exc:
+        # The whole point: a provider outage must not silently pass a post
+        # through as if it had been confirmed.
+        post.originality_evidence = OriginalityEvidence.PROVIDER_UNAVAILABLE
+        post.save(update_fields=["originality_evidence", "updated_at"])
+        return {"status": "provider-error", "post": post_id, "detail": str(exc)[:200]}
+
     if not raw:
         # The platform no longer returns the post. Do not silently keep the
         # seller's claim; flag it for review.
+        post.originality_evidence = OriginalityEvidence.PROVIDER_UNAVAILABLE
         post.set_verification(
             PostVerificationStatus.PROVIDER_ERROR,
             "Post could not be retrieved from the platform.",
@@ -93,7 +110,7 @@ def refresh_post_facts(self, post_id):
     facts = getattr(provider, "normalize_post", None)
     payload = facts(raw) if callable(facts) else raw
 
-    changed = []
+    changed = ["originality_evidence"]
     if payload.get("is_repost") is not None and payload["is_repost"] != post.is_repost:
         post.is_repost = bool(payload["is_repost"])
         changed.append("is_repost")
@@ -103,9 +120,19 @@ def refresh_post_facts(self, post_id):
     if payload.get("text") is not None and payload["text"] != post.text_snapshot:
         post.text_snapshot = payload["text"][:5000]
         changed.append("text_snapshot")
-    if changed:
-        post.save(update_fields=[*changed, "updated_at"])
-    return {"status": "ok", "post": post_id, "updated": changed}
+    # Provenance records what the platform actually told us, not what we assume.
+    post.originality_evidence = (
+        OriginalityEvidence.PROVIDER_CONFIRMED
+        if post.is_original
+        else OriginalityEvidence.PROVIDER_REJECTED
+    )
+    post.save(update_fields=[*changed, "updated_at"])
+    return {
+        "status": "ok",
+        "post": post_id,
+        "evidence": post.originality_evidence,
+        "updated": changed,
+    }
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

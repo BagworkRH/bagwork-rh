@@ -27,9 +27,22 @@ from django.utils import timezone
 from apps.audit.models import AuditLog
 from apps.campaigns.models import Campaign, RewardModel
 from apps.rewards.models import Reward, RewardCalculationVersion, RewardStatus
-from apps.social.models import PostVerificationStatus
+from apps.social.models import OriginalityEvidence, PostVerificationStatus
 
 from .exceptions import RewardEngineError
+
+
+def _originality_is_payable(campaign, post) -> bool:
+    """Whether a post's originality is good enough to pay out on.
+
+    Campaigns may opt out explicitly (`allow_unconfirmed_originality`) for
+    private pilots, but the default is that money only moves when the platform
+    has confirmed the post is the creator's own.
+    """
+    req = campaign.requirements_json or {}
+    if req.get("allow_unconfirmed_originality", False):
+        return True
+    return post.originality_evidence == OriginalityEvidence.PROVIDER_CONFIRMED
 
 CALCULATION_VERSION = RewardCalculationVersion.V1
 ZERO = Decimal("0")
@@ -178,6 +191,16 @@ def calculate_reward(campaign, post, seller, snapshot=None, *, user=None) -> Rew
     """
     if post.verification_status != PostVerificationStatus.VERIFIED:
         raise RewardEngineError("Post must be VERIFIED before a reward can be calculated.")
+
+    # Defence in depth. Verification already refuses to confirm a post whose
+    # originality was never checked, but the money path re-asserts it so a
+    # future status change cannot silently open a payout on an assumption.
+    if not _originality_is_payable(campaign, post):
+        raise RewardEngineError(
+            f"Originality is {post.get_originality_evidence_display()} for this post; "
+            "no reward is paid on an unconfirmed originality claim. Review and "
+            "confirm with the platform first."
+        )
 
     result = apply_caps(campaign, seller, post, snapshot)
 

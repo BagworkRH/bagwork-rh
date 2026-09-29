@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.social.models import (
+    OriginalityEvidence,
     PostMetricSnapshot,
     PostVerificationStatus,
     SocialAccount,
@@ -114,6 +115,7 @@ class PostDiscoveryTests(TestCase):
             text_snapshot="no hashtag here",
             published_at=timezone.now(),
             verification_status=PostVerificationStatus.DISCOVERED,
+            originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
         )
         result = run_verification(post, actor=user)
         self.assertEqual(result.verification_status, PostVerificationStatus.REQUIREMENT_MISSING)
@@ -129,6 +131,7 @@ class PostDiscoveryTests(TestCase):
             text_snapshot="hello #campaign",
             published_at=timezone.now(),
             verification_status=PostVerificationStatus.DISCOVERED,
+            originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
         )
         result = run_verification(
             post,

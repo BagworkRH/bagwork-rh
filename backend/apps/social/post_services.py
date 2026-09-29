@@ -11,7 +11,13 @@ from django.utils import timezone
 
 from apps.audit.models import AuditLog
 
-from .models import PostMetricSnapshot, PostVerificationStatus, SocialPlatform, SocialPost
+from .models import (
+    OriginalityEvidence,
+    PostMetricSnapshot,
+    PostVerificationStatus,
+    SocialPlatform,
+    SocialPost,
+)
 
 ALLOWED_METRIC_FIELDS = ("likes", "reposts", "replies", "quotes", "bookmarks")
 
@@ -59,6 +65,67 @@ def create_post_from_provider(seller, campaign, payload, *, actor=None) -> Socia
     )
 
 
+def _originality_failure(post, req):
+    """Return (status, reason) if the post cannot earn on originality grounds.
+
+    Two independent gates, deliberately separate:
+
+    * The *flag* gate looks at is_repost/is_quote. Waivable via
+      `allow_non_original` for research campaigns.
+    * The *evidence* gate asks whether the platform actually confirmed this.
+      Paying out on an assumption is how a rewards program gets farmed, so
+      when the provider was unreachable we do not fall back to trusting the
+      seller -- the post waits for a human. A provider that positively said
+      "repost" is never overridden by `allow_non_original`.
+    """
+    if not post.is_original and not req.get("allow_non_original", False):
+        kind = "repost" if post.is_repost else "quote"
+        return (
+            PostVerificationStatus.NOT_ORIGINAL,
+            f"Post is a {kind}, not original content; not eligible for a reward.",
+        )
+
+    if req.get("allow_unconfirmed_originality", False):
+        return None
+
+    if post.originality_evidence == OriginalityEvidence.PROVIDER_REJECTED:
+        return (
+            PostVerificationStatus.NOT_ORIGINAL,
+            "The platform reports this post is not original.",
+        )
+    if post.originality_evidence != OriginalityEvidence.PROVIDER_CONFIRMED:
+        return (
+            PostVerificationStatus.PROVIDER_ERROR,
+            "Originality not confirmed by the platform; needs review before "
+            "this post can earn. No reward is paid on an unverified claim.",
+        )
+    return None
+
+
+def _disclosure_failure(post, req):
+    """Return (status, reason) if a required disclosure is missing."""
+    text = post.text_snapshot or ""
+    missing = [d for d in req.get("required_disclosure", []) if d.lower() not in text.lower()]
+    if not missing:
+        return None
+    return (
+        PostVerificationStatus.NOT_DISCLOSED,
+        f"Missing required disclosure: {', '.join(missing)}",
+    )
+
+
+def _hashtag_failure(post, req):
+    """Return (status, reason) if a required hashtag is missing."""
+    text = post.text_snapshot or ""
+    missing = [h for h in req.get("required_hashtags", []) if h.lower() not in text.lower()]
+    if not missing:
+        return None
+    return (
+        PostVerificationStatus.REQUIREMENT_MISSING,
+        f"Missing required hashtags: {', '.join(missing)}",
+    )
+
+
 def run_verification(post, *, snapshot=None, actor=None) -> SocialPost:
     """Advance the verification pipeline for a post.
 
@@ -81,43 +148,13 @@ def run_verification(post, *, snapshot=None, actor=None) -> SocialPost:
 
     req = campaign.requirements_json or {}
 
-    # Originality gate. We pay for a creator producing content, not for
-    # amplifying someone else's, so a repost or quote never earns. Campaigns
-    # may opt out via `allow_non_original` for research/measurement, but the
-    # default is that only original posts are eligible.
-    if not post.is_original and not req.get("allow_non_original", False):
-        kind = "repost" if post.is_repost else "quote"
-        post.set_verification(
-            PostVerificationStatus.NOT_ORIGINAL,
-            f"Post is a {kind}, not original content; not eligible for a reward.",
-        )
-        return post
-
-    # Disclosure gate. Creators are paid for disclosed posts; an undisclosed
-    # post is both a compliance problem and grounds for reversal.
-    required_disclosure = req.get("required_disclosure", [])
-    text = post.text_snapshot or ""
-    if required_disclosure:
-        missing_disclosure = [
-            d for d in required_disclosure if d.lower() not in text.lower()
-        ]
-        if missing_disclosure:
-            post.set_verification(
-                PostVerificationStatus.NOT_DISCLOSED,
-                f"Missing required disclosure: {', '.join(missing_disclosure)}",
-            )
+    # Order matters: originality before disclosure, both before hashtags, so
+    # the most fundamental reason is the one a creator sees first.
+    for check in (_originality_failure, _disclosure_failure, _hashtag_failure):
+        failure = check(post, req)
+        if failure is not None:
+            post.set_verification(*failure)
             return post
-
-    # Requirement check: text must contain required hashtags/mentions.
-    text = post.text_snapshot or ""
-    required_hashtags = req.get("required_hashtags", [])
-    missing = [h for h in required_hashtags if h.lower() not in text.lower()]
-    if missing:
-        post.set_verification(
-            PostVerificationStatus.REQUIREMENT_MISSING,
-            f"Missing required hashtags: {', '.join(missing)}",
-        )
-        return post
 
     # Record a metric snapshot when metrics are available.
     if snapshot is not None:

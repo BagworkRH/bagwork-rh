@@ -13,33 +13,37 @@ self-reporting their way to a payout.
 Thin: neither provider has touched a real API, the discovery path that *is* the
 product does not exist, and anti-abuse is a stub.
 
-## Stage 0 — Unblock ourselves  (blocking everything)
+## Stage 0 — Unblock ourselves  (blocking everything)  — DONE
 
 The last three fixes (platform-scoped submit, `importlib` registry fix,
 `refresh_post_facts`) are committed nowhere and the full suite has not run
 green since they landed. No further work should start on an unverified tree.
 
-- [ ] Kill stray `python.exe` processes wedging the test runner
-- [ ] `manage.py test` serial, green
-- [ ] Commit + push, CI green
+- [x] Kill stray `python.exe` processes wedging the test runner
+- [x] `manage.py test` serial, green (220)
+- [x] Commit + push, CI green (`135da1c`)
 
 **Done when:** CI is green on a commit containing all three fixes.
 
-## Stage 1 — Make failures fail closed  (highest risk per line of work)
+## Stage 1 — Make failures fail closed  (highest risk per line of work)  — DONE
 
-The originality gate currently defaults to "original" and is corrected by a
-provider call. If that call is wrong, times out, or the field is absent, a
-repost verifies and earns. It fails **open**, which is the dangerous direction
-for a system that pays out.
+The originality gate defaulted to "original" and was corrected by a provider
+call. If that call was wrong, timed out, or the field was absent, a repost
+verified and earned. It failed **open**, the dangerous direction for a system
+that pays out.
 
-- [ ] Post records how originality was established: `UNVERIFIED` /
-      `PROVIDER_CONFIRMED` / `PROVIDER_UNAVAILABLE`
-- [ ] Unconfirmed originality cannot reach `VERIFIED` without human review
-- [ ] Alert when a provider is unreachable, rather than silently passing
-- [ ] Contract test: any provider error must not produce a paid reward
+- [x] `originality_evidence` records provenance: `SELF_REPORTED` /
+      `PROVIDER_CONFIRMED` / `PROVIDER_REJECTED` / `PROVIDER_UNAVAILABLE`
+- [x] Unconfirmed originality cannot reach `VERIFIED` (`PROVIDER_ERROR` instead)
+- [x] `refresh_post_facts` records `PROVIDER_UNAVAILABLE` on a provider error
+- [x] Money path re-asserts it: `calculate_reward` refuses unconfirmed posts
+- [x] 6 fail-closed tests; verified a broken provider yields no payout
 
 **Done when:** no code path exists where an unavailable provider yields a paid
 reward. Prove it by breaking the provider and asserting nothing is paid.
+
+**Not done (Stage 8):** alerting on provider unavailability. Right now it is
+logged, not paged.
 
 ## Stage 2 — Real API credentials  (blocked on us, not engineering)
 

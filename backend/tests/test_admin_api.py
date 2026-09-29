@@ -17,7 +17,7 @@ from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.models import RewardStatus
 from apps.rewards.services import approve_reward, calculate_reward, make_available
 from apps.sellers.models import SellerProfile
-from apps.social.models import PostVerificationStatus, SocialPost
+from apps.social.models import OriginalityEvidence, PostVerificationStatus, SocialPost
 from apps.wallets.models import ClaimStatus
 from apps.wallets.services import create_claim
 
@@ -74,6 +74,8 @@ def make_reward(  # noqa: PLR0913 - test helper with sensible defaults
         text_snapshot="promo",
         published_at=timezone.now(),
         verification_status=PostVerificationStatus.VERIFIED,
+        # A reward is only payable when the platform confirmed originality.
+        originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
     )
     reward = calculate_reward(campaign, post, profile, user=user)
     return user, profile, campaign, post, reward

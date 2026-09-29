@@ -90,6 +90,24 @@ class PostVerificationStatus(models.TextChoices):
     SUSPICIOUS_ACTIVITY = "SUSPICIOUS_ACTIVITY", "Suspicious activity"
 
 
+class OriginalityEvidence(models.TextChoices):
+    """How we came to believe a post is original.
+
+    This is the difference between a verified fact and an assumption. Paying out
+    on an assumption is how a payout system gets farmed, so SELF_REPORTED and
+    PROVIDER_UNAVAILABLE are explicitly *not* treated as original.
+    """
+
+    # Never checked against the platform: the submit endpoint's self-report.
+    SELF_REPORTED = "SELF_REPORTED", "Self-reported (never checked)"
+    # Checked and the platform says it is the creator's own post.
+    PROVIDER_CONFIRMED = "PROVIDER_CONFIRMED", "Confirmed by provider"
+    # Checked, and the platform told us it is a repost or quote.
+    PROVIDER_REJECTED = "PROVIDER_REJECTED", "Rejected by provider"
+    # We tried to check and the provider was unreachable or errored.
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE", "Provider unavailable"
+
+
 class SocialPost(models.Model):
     """A discovered qualifying post on any supported platform (Spec 02 & 03)."""
 
@@ -118,6 +136,13 @@ class SocialPost(models.Model):
     # always the creator's own upload).
     is_repost = models.BooleanField(default=False)
     is_quote = models.BooleanField(default=False)
+    # Provenance of the originality claim. Absent provider confirmation, this
+    # stays SELF_REPORTED and the post is not eligible for a reward.
+    originality_evidence = models.CharField(
+        max_length=24,
+        choices=OriginalityEvidence.choices,
+        default=OriginalityEvidence.SELF_REPORTED,
+    )
 
     verification_status = models.CharField(
         max_length=32,

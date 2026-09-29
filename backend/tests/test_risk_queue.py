@@ -14,7 +14,12 @@ from apps.audit.models import AuditLog, RiskFlag, RiskStatus, RiskSubjectType
 from apps.blockchain import services as chain
 from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.services import approve_reward, calculate_reward, make_available
-from apps.social.models import PostMetricSnapshot, PostVerificationStatus, SocialPost
+from apps.social.models import (
+    OriginalityEvidence,
+    PostMetricSnapshot,
+    PostVerificationStatus,
+    SocialPost,
+)
 from apps.social.tasks import flag_suspicious_activity
 from apps.wallets.models import ClaimStatus
 from apps.wallets.services import create_claim
@@ -35,6 +40,10 @@ def make_post(profile, campaign, external_id, **kwargs):
         "published_at": kwargs.pop("published_at", timezone.now()),
         "verification_status": kwargs.pop(
             "verification_status", PostVerificationStatus.VERIFIED
+        ),
+        # A reward is only payable when the platform confirmed originality.
+        "originality_evidence": kwargs.pop(
+            "originality_evidence", OriginalityEvidence.PROVIDER_CONFIRMED
         ),
     }
     defaults.update(kwargs)

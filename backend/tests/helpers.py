@@ -11,7 +11,12 @@ from apps.blockchain import signing
 from apps.blockchain.models import TokenConfig
 from apps.campaigns.models import Campaign, CampaignStatus, RewardModel
 from apps.sellers.models import SellerProfile
-from apps.social.models import PostVerificationStatus, SocialPlatform, SocialPost
+from apps.social.models import (
+    OriginalityEvidence,
+    PostVerificationStatus,
+    SocialPlatform,
+    SocialPost,
+)
 from apps.wallets.models import Wallet
 
 User = get_user_model()
@@ -209,10 +214,43 @@ def make_verified_wallet(
     return wallet
 
 
-def make_verified_post(
-    profile, campaign, external_id="123456789", text="#", platform=SocialPlatform.X
+def make_post(profile, campaign, external_id, text="#", **kwargs):
+    """Create a SocialPost with test-friendly defaults.
+
+    Defaults to provider-confirmed originality: since a post only earns when
+    the platform has confirmed it, any test that expects a payout must supply
+    that evidence rather than inherit an assumption.
+    """
+    defaults = {
+        "account": None,
+        "platform": SocialPlatform.X,
+        "external_post_id": external_id,
+        "seller": profile,
+        "campaign": campaign,
+        "post_url": f"https://x.com/status/{external_id}",
+        "text_snapshot": text,
+        "published_at": timezone.now(),
+        "originality_evidence": OriginalityEvidence.PROVIDER_CONFIRMED,
+    }
+    defaults.update(kwargs)
+    return SocialPost.objects.create(**defaults)
+
+
+def make_verified_post(  # noqa: PLR0913 - test helper with sensible defaults
+    profile,
+    campaign,
+    external_id="123456789",
+    text="#",
+    *,
+    platform=SocialPlatform.X,
+    originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
 ):
-    """Create a post already in VERIFIED state."""
+    """Create a post already in VERIFIED state.
+
+    Defaults to provider-confirmed originality, since a VERIFIED post with an
+    unconfirmed originality claim is no longer payable and most reward tests
+    are about the money path.
+    """
     post = SocialPost.objects.create(
         account=None,
         platform=platform,
@@ -223,5 +261,6 @@ def make_verified_post(
         text_snapshot=text,
         published_at=timezone.now(),
         verification_status=PostVerificationStatus.VERIFIED,
+        originality_evidence=originality_evidence,
     )
     return post

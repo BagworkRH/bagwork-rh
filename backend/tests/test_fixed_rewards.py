@@ -13,7 +13,11 @@ from django.utils import timezone
 from apps.campaigns.models import RewardModel
 from apps.campaigns.serializers import CampaignSerializer
 from apps.rewards.services import compute_raw_reward
-from apps.social.models import PostVerificationStatus, SocialPost
+from apps.social.models import (
+    OriginalityEvidence,
+    PostVerificationStatus,
+    SocialPost,
+)
 from apps.social.post_services import run_verification
 from apps.social.providers.official import OfficialXProvider
 
@@ -27,7 +31,10 @@ class OriginalityGateTests(TestCase):
         self.now = timezone.now()
 
     def _post(self, external_id, **kwargs):
+        # A post only earns when the platform has confirmed it, so tests that
+        # expect a verified post must supply that evidence rather than assume it.
         kwargs.setdefault("text_snapshot", "hello #ad")
+        kwargs.setdefault("originality_evidence", OriginalityEvidence.PROVIDER_CONFIRMED)
         post = SocialPost.objects.create(
             seller=self.profile,
             campaign=self.campaign,
@@ -65,12 +72,16 @@ class OriginalityGateTests(TestCase):
             post_url="https://x.com/i/status/undisc-1",
             text_snapshot="no disclosure here",
             published_at=self.now,
+            originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
         )
         post = run_verification(post)
         self.assertEqual(post.verification_status, PostVerificationStatus.NOT_DISCLOSED)
 
     def test_campaign_may_opt_into_non_original(self):
-        # Kept available for research/measurement, off by default.
+        # `allow_non_original` waives the *flag* gate only. The evidence gate
+        # still requires the platform to have looked at the post -- two
+        # deliberate, independent switches. A provider that has actively said
+        # "this is a repost" is never overridden by this flag.
         campaign = make_campaign(
             slug="non-original-campaign",
             requirements_json={"allow_non_original": True},
@@ -83,6 +94,110 @@ class OriginalityGateTests(TestCase):
             text_snapshot="reposted #ad",
             published_at=self.now,
             is_repost=True,
+            originality_evidence=OriginalityEvidence.PROVIDER_CONFIRMED,
+        )
+        post = run_verification(post)
+        self.assertEqual(post.verification_status, PostVerificationStatus.VERIFIED)
+
+    def test_allow_non_original_does_not_override_provider_rejection(self):
+        # The flag must not become a way to pay for a post the platform has
+        # positively identified as a repost.
+        campaign = make_campaign(
+            slug="non-original-strict",
+            requirements_json={"allow_non_original": True},
+        )
+        post = SocialPost.objects.create(
+            seller=self.profile,
+            campaign=campaign,
+            external_post_id="rep-3",
+            post_url="https://x.com/i/status/rep-3",
+            text_snapshot="reposted #ad",
+            published_at=self.now,
+            is_repost=True,
+            originality_evidence=OriginalityEvidence.PROVIDER_REJECTED,
+        )
+        post = run_verification(post)
+        self.assertEqual(post.verification_status, PostVerificationStatus.NOT_ORIGINAL)
+
+
+class FailClosedTests(TestCase):
+    """A reward must never be paid on an unconfirmed originality claim.
+
+    This is the whole point of Stage 1: if the platform is unreachable we do
+    not fall back to trusting the seller. Breaking the provider must not
+    produce a payout.
+    """
+
+    def setUp(self):
+        self.user, self.profile = make_user()
+        self.campaign = make_campaign(slug="fail-closed")
+        self.now = timezone.now()
+
+    def _post(self, external_id, evidence, **kwargs):
+        kwargs.setdefault("text_snapshot", "original content #ad")
+        post = SocialPost.objects.create(
+            seller=self.profile,
+            campaign=self.campaign,
+            external_post_id=external_id,
+            post_url=f"https://x.com/i/status/{external_id}",
+            published_at=self.now,
+            originality_evidence=evidence,
+            **kwargs,
+        )
+        return run_verification(post)
+
+    def test_self_reported_originality_does_not_verify(self):
+        post = self._post("fc-1", OriginalityEvidence.SELF_REPORTED)
+        self.assertEqual(post.verification_status, PostVerificationStatus.PROVIDER_ERROR)
+        self.assertIn("not confirmed", post.rejection_reason.lower())
+
+    def test_unavailable_provider_does_not_verify(self):
+        post = self._post("fc-2", OriginalityEvidence.PROVIDER_UNAVAILABLE)
+        self.assertEqual(post.verification_status, PostVerificationStatus.PROVIDER_ERROR)
+
+    def test_provider_rejected_is_not_original(self):
+        post = self._post(
+            "fc-3", OriginalityEvidence.PROVIDER_REJECTED, is_repost=True
+        )
+        self.assertEqual(post.verification_status, PostVerificationStatus.NOT_ORIGINAL)
+
+    def test_provider_confirmed_verifies(self):
+        post = self._post("fc-4", OriginalityEvidence.PROVIDER_CONFIRMED)
+        self.assertEqual(post.verification_status, PostVerificationStatus.VERIFIED)
+
+    def test_unconfirmed_post_cannot_be_paid(self):
+        # The reward layer must refuse even if a post somehow claims VERIFIED.
+        from apps.rewards.exceptions import RewardEngineError  # noqa: PLC0415
+        from apps.rewards.services import calculate_reward  # noqa: PLC0415
+
+        post = SocialPost.objects.create(
+            seller=self.profile,
+            campaign=self.campaign,
+            external_post_id="fc-5",
+            post_url="https://x.com/i/status/fc-5",
+            text_snapshot="#ad",
+            published_at=self.now,
+            originality_evidence=OriginalityEvidence.SELF_REPORTED,
+            verification_status=PostVerificationStatus.VERIFIED,
+        )
+        with self.assertRaises(RewardEngineError):
+            calculate_reward(self.campaign, post, self.profile)
+
+    def test_campaign_may_opt_out_of_the_evidence_gate(self):
+        # An explicit escape hatch, off by default, for campaigns that accept
+        # self-reported originality (e.g. a private pilot).
+        campaign = make_campaign(
+            slug="pilot-campaign",
+            requirements_json={"allow_unconfirmed_originality": True},
+        )
+        post = SocialPost.objects.create(
+            seller=self.profile,
+            campaign=campaign,
+            external_post_id="fc-6",
+            post_url="https://x.com/i/status/fc-6",
+            text_snapshot="pilot post #ad",
+            published_at=self.now,
+            originality_evidence=OriginalityEvidence.SELF_REPORTED,
         )
         post = run_verification(post)
         self.assertEqual(post.verification_status, PostVerificationStatus.VERIFIED)
