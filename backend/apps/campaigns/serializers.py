@@ -1,6 +1,8 @@
 """Campaign API serializers (Spec 02)."""
 from rest_framework import serializers
 
+from apps.rewards.exceptions import RewardEngineError
+
 from .models import Campaign, CampaignParticipation, RewardModel
 
 
@@ -65,6 +67,49 @@ class CampaignSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated and hasattr(request.user, "seller_profile"):
             return obj.participations.filter(seller=request.user.seller_profile).exists()
         return False
+
+
+class CampaignWriteSerializer(serializers.ModelSerializer):
+    """Create/update payload for a campaign (staff-only).
+
+    Separate from the read serializer on purpose: the public one hides
+    `remaining_budget` and never accepts writes, while this one owns the
+    campaign's money and window rules.
+    """
+
+    class Meta:
+        model = Campaign
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "description",
+            "project_name",
+            "token_symbol",
+            "chain_id",
+            "budget",
+            "reward_model",
+            "reward_rate",
+            "maximum_reward_per_seller",
+            "maximum_rewards_per_seller",
+            "start_at",
+            "end_at",
+            "requirements_json",
+        )
+        read_only_fields = ("id",)
+
+    def validate(self, attrs):
+        from apps.campaigns.services import _validate_campaign_fields  # noqa: PLC0415
+
+        # Model-level rules (fixed-only, budget covers one payout, window order)
+        # live in the service so the shell and admin paths are held to the same.
+        # The service raises a domain error; a serializer must turn that into a
+        # 400 with a readable message rather than let it escape as a 500.
+        try:
+            _validate_campaign_fields(dict(attrs), existing=self.instance)
+        except RewardEngineError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return attrs
 
 
 class CampaignJoinSerializer(serializers.ModelSerializer):

@@ -91,15 +91,25 @@ a live response. See Stage 2 — this is the code Stage 2 will exercise.
 - X rate limits are per-user (900/15min); sharding, not a longer interval, is
   the answer at scale.
 
-## Stage 4 — Campaign creation API
+## Stage 4 — Campaign creation API  — DONE
 
-Campaigns come from the seed or Django admin. The `FIXED`-only validation exists
-but guards a door nobody can walk through.
+Campaigns came from the seed or Django admin. The `FIXED`-only validation existed
+but guarded a door nobody could walk through.
 
-- [ ] `POST /campaigns/`, staff-only
-- [ ] Requirement editor (hashtags, disclosure, window, caps)
-- [ ] Budget validation: budget >= rate, caps sane
-- [ ] Publish / pause / end transitions exposed
+- [x] `POST /api/v1/campaigns/`, staff-only (`IsAuthenticatedOrReadOnly` plus an
+      explicit staff check, so an authenticated non-staff user gets 403)
+- [x] `PATCH /api/v1/campaigns/<slug>/`, staff-only
+- [x] `POST /api/v1/campaigns/<slug>/launch/` to publish a draft
+- [x] Validation lives in the service, so the shell and admin are held to the
+      same rules: fixed-only, budget must cover at least one payout, window
+      order, seller cap, and no budget beyond `max_posts x rate`
+- [x] `budget`, `reward_rate`, `chain_id` and `remaining_budget` are immutable
+      once set -- changing them mid-flight would make calculated rewards
+      irreproducible. Start a new campaign instead
+- [x] An ACTIVE campaign cannot be edited; pause it first
+- [x] Money fields are coerced to Decimal in the service, so a string from the
+      shell or a test cannot be stored and fail later inside the reward engine
+- [x] 22 tests
 
 **Done when:** an operator can create and launch a campaign without a shell.
 
