@@ -142,6 +142,52 @@ def wallet_verify(request, pk):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def my_posts(request):
+    """The signed-in creator's own posts, newest first.
+
+    Scoped to the requesting seller: a creator can see their own post status
+    and, when a post was rejected, why -- they need that in order to fix it.
+    They can never see another seller's posts. This is the creator-facing
+    replacement for the now staff-only `GET /api/v1/posts/`.
+    """
+    profile = getattr(request.user, "seller_profile", None)
+    if profile is None:
+        return Response({"detail": "No seller profile."}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = SocialPost.objects.filter(seller=profile).order_by("-discovered_at")
+    status_param = request.query_params.get("status")
+    if status_param:
+        qs = qs.filter(verification_status=status_param)
+    return Response([_my_post_payload(p) for p in qs[:100]])
+
+
+def _my_post_payload(post):
+    """A creator-facing post view.
+
+    Deliberately excludes nothing the creator is entitled to see about their own
+    content, and exposes nothing about other sellers.
+    """
+    return {
+        "id": post.pk,
+        "platform": post.platform,
+        "external_post_id": post.external_post_id,
+        "post_url": post.post_url,
+        "campaign": post.campaign.slug if post.campaign else None,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "verification_status": post.verification_status,
+        "rejection_reason": post.rejection_reason,
+        "is_original": post.is_original,
+        "originality_evidence": post.originality_evidence,
+        "impressions": post.impressions,
+        "likes": post.likes,
+        "reposts": post.reposts,
+        "replies": post.replies,
+        "total_engagement": post.total_engagement,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def my_rewards(request):
     rewards = Reward.objects.filter(seller__user=request.user).order_by("-created_at")
     return Response(

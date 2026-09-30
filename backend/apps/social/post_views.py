@@ -2,7 +2,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.campaigns.models import Campaign
@@ -35,9 +35,14 @@ def _post_payload(post):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def post_list(request):
-    """List posts (optionally filter by campaign/seller/status)."""
+    """Staff review queue: every tracked post, across all sellers.
+
+    NOT public. This exposes post URLs and engagement counts derived from X
+    data, so it is restricted to staff. Creators see only their own posts, via
+    `GET /api/v1/me/posts/`.
+    """
     qs = SocialPost.objects.all().order_by("-discovered_at")
     campaign = request.query_params.get("campaign")
     seller = request.query_params.get("seller")
@@ -52,8 +57,9 @@ def post_list(request):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def post_detail(request, pk):
+    """A single post's details. Staff only; see `post_list`."""
     post = get_object_or_404(SocialPost, pk=pk)
     return Response(_post_payload(post))
 
