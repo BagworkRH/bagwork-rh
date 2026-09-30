@@ -16,6 +16,12 @@ This script does the PKCE handshake by hand, in your own browser:
      depends on.
 
     python scripts/x_oauth_check.py
+    python scripts/x_oauth_check.py --post-id 1234567890123456789
+
+With --post-id it makes the cheapest possible call (a single post lookup)
+instead of the timeline, and reports whether referenced_tweets is returned.
+That is enough to validate Stage 1's originality gate without paying for a
+timeline read.
 
 It prints field NAMES and counts, never a token or secret. The token stays in
 memory and is never written to disk.
@@ -51,12 +57,59 @@ def read_env(name):
         pass
     return None
 
+def _arg_post_id():
+    """--post-id 1234... : use the cheap single-post path instead of timeline."""
+    argv = sys.argv
+    if "--post-id" in argv:
+        i = argv.index("--post-id")
+        if i + 1 < len(argv):
+            return argv[i + 1].strip()
+        print("--post-id needs a value")
+        sys.exit(1)
+    return None
+
+
+def _explain_billing(response):
+    """Turn an HTTP error into something a human can act on."""
+    status = response.status_code
+    if status == 402:
+        print("        HTTP 402 Payment Required -- your X credit balance is depleted.")
+        print("        This is NOT a permissions problem; the request was accepted and")
+        print("        billed. Top up under Developer Console > Credits, then re-run.")
+    elif status == 403:
+        print("        HTTP 403 Forbidden -- the app lacks access to this endpoint.")
+        print("        Check App permissions = Read, and Type of App = Web App.")
+    elif status == 401:
+        print("        HTTP 401 Unauthorized -- the token was rejected. Re-run the script.")
+    else:
+        print(f"        HTTP {status}: {response.text[:300]}")
+
+
+def _report_post(post):
+    """Print what came back, focusing on the field Stage 1 depends on."""
+    refs = post.get("referenced_tweets")
+    kinds = ", ".join(r.get("type", "?") for r in refs) if refs else "-"
+    text = (post.get("text") or "")[:60].replace("\n", " ")
+    print(f"        id={post.get('id')}")
+    print(f"        referenced_tweets present: {'referenced_tweets' in post}")
+    print(f"        referenced_tweets types  : {kinds}")
+    print(f"        text: {text!r}")
+    print()
+    print("        What this means:")
+    print("        - types '-' on an ORIGINAL post is correct.")
+    print("        - types 'reposted' on a post you reposted is correct.")
+    print("        Our normalize_post() looks for exactly those two strings.")
+    print("        If this post is original and shows 'reposted', STOP: the")
+    print("        originality gate would misjudge it and needs fixing.")
+
 
 def pkce_pair():
     verifier = secrets.token_urlsafe(48)[:128]
     digest = hashlib.sha256(verifier.encode()).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
     return verifier, challenge
+
+
 def main():
     client_id = read_env("X_CLIENT_ID")
     client_secret = read_env("X_CLIENT_SECRET")
@@ -151,7 +204,27 @@ def main():
     user = me.json()["data"]
     print(f"        @{user['username']}  (id {user['id']})\n")
 
-    print("STEP 5 - can I read the timeline? (discovery depends on this)")
+    post_id = _arg_post_id()
+    if post_id:
+        # Cheapest possible check. A single post lookup is far less likely to be
+        # billed than a timeline read, and it is enough to answer the only
+        # question we actually need answered: does referenced_tweets come back?
+        print(f"STEP 5 - single post lookup for id {post_id} (cheapest check)")
+        lookup = requests.get(
+            f"{API}/tweets/{post_id}",
+            headers=headers,
+            params={"tweet.fields": "created_at,text,referenced_tweets,public_metrics"},
+            timeout=30,
+        )
+        if not lookup.ok:
+            _explain_billing(lookup)
+            return 1
+        post = lookup.json().get("data") or {}
+        _report_post(post)
+        print("\nDone. Paste the whole output here -- it contains no tokens.")
+        return 0
+
+    print("STEP 5 - can I read the timeline? (COSTS CREDITS -- this may return 402)")
     timeline = requests.get(
         f"{API}/users/{user['id']}/timelines/reverse_chronological",
         headers=headers,
@@ -163,8 +236,7 @@ def main():
         timeout=30,
     )
     if not timeline.ok:
-        print(f"        timeline FAILED (HTTP {timeline.status_code}): {timeline.text[:300]}")
-        print("        A 403 here usually means the app lacks timeline access yet.")
+        _explain_billing(timeline)
         return 1
 
     posts = timeline.json().get("data") or []
