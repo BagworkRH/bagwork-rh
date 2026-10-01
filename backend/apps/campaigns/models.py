@@ -120,7 +120,7 @@ class BrandProfile(models.Model):
     company_name = models.CharField(max_length=255)
     # Human-facing contact. Not an authentication factor; auth stays on User.
     contact_email = models.EmailField(blank=True)
-    # This brand's on-chain address, used to attribute incoming USDC.
+    # This brand's on-chain address, used to attribute incoming stablecoin.
     funding_wallet = models.CharField(max_length=42, blank=True)
     status = models.CharField(
         max_length=16, choices=BrandStatus.choices, default=BrandStatus.PENDING
@@ -146,12 +146,15 @@ class FundingStatus(models.TextChoices):
 
 
 class BrandFunding(models.Model):
-    """A USDC deposit funding a brand's campaign payouts.
+    """A brand funding deposit, in the platform stablecoin (USDG by default).
 
-    Brands pay in USDC and creators are paid in USDC, so the platform never
-    converts to fiat and never becomes an exchanger. USDC is a stablecoin
-    precisely so a creator's $5 is $5 at payout, with none of the volatility
-    that made paying creators in the platform token unacceptable.
+    Brands pay in stablecoin and creators are paid in the same stablecoin, so the
+    platform never converts to fiat and never becomes an exchanger.
+
+    The stablecoin is dollar-denominated precisely so a creator payout holds its
+    value. Paying creators in the platform token instead would expose the people
+    doing the work to its price, which is the failure mode the payout design
+    exists to avoid.
 
     Replay protection is the load-bearing concern: a deposit is credited from
     an on-chain transfer, and the same transfer must never fund two campaigns
@@ -162,11 +165,17 @@ class BrandFunding(models.Model):
 
     brand = models.ForeignKey(BrandProfile, on_delete=models.PROTECT, related_name="fundings")
     # 18 decimal places, matching the widest precision the allowlist permits
-    # (USDC is 6, the platform default is 18). A narrower column would round a
+    # (USDG is 18, USDC would be 6). A narrower column would round a
     # deposit off-cent and make it fail to match the payouts it was sent to fund.
     amount = models.DecimalField(max_digits=40, decimal_places=18)
     chain_id = models.PositiveIntegerField()
-    token_symbol = models.CharField(max_length=16, default="USDC")
+    token_symbol = models.CharField(
+        max_length=16,
+        # Default is applied in the service from settings.FUNDING_TOKEN_SYMBOL
+        # rather than hardcoded, so the funding token has a single definition.
+        # Kept in sync by `record_funding`.
+        default="USDG",
+    )
     tx_hash = models.CharField(max_length=66)
     status = models.CharField(
         max_length=16, choices=FundingStatus.choices, default=FundingStatus.PENDING

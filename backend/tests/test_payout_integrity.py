@@ -27,15 +27,15 @@ from .helpers import make_campaign
 
 User = get_user_model()
 
-USDC = "0x00000000000000000000000000000000000000DC"
+USDG_ADDRESS = "0x00000000000000000000000000000000000000DC"
 TX = "0x" + "d" * 64
 
 
-def make_usdc(chain_id=46630, decimals=6):
-    """USDC on the allowlist at its real 6-decimal precision."""
+def make_funding_token(chain_id=46630, decimals=6):
+    """USDG on the allowlist at its own precision."""
     token, _ = TokenConfig.objects.get_or_create(
-        symbol="USDC",
-        defaults={"chain_id": chain_id, "address": USDC, "decimals": decimals, "enabled": True},
+        symbol="USDG",
+        defaults={"chain_id": chain_id, "address": USDG_ADDRESS, "decimals": decimals, "enabled": True},
     )
     return token
 
@@ -56,7 +56,7 @@ def campaign_fields(**overrides):
     fields = {
         "description": "d",
         "project_name": "P",
-        "token_symbol": "USDC",
+        "token_symbol": "USDG",
         "chain_id": 46630,
         "reward_model": "FIXED",
         "reward_rate": Decimal("5"),
@@ -70,7 +70,13 @@ def campaign_fields(**overrides):
 
 
 class FeeDecimalsTests(TestCase):
-    """USDC is 6 decimals. Quoting at 18 invents precision the chain lacks."""
+    """Fee precision must come from the token, not a platform default.
+
+    Written against an explicit precision rather than the funding token's, so
+    the property holds whichever stablecoin is allowlisted: the point is that
+    the caller supplies the token's decimals, not that any one token has a
+    particular number.
+    """
 
     def test_fee_matches_the_contract_at_the_token_real_precision(self):
         self.assertEqual(fees.platform_fee(Decimal("500"), 6), Decimal("75"))
@@ -85,7 +91,7 @@ class FeeDecimalsTests(TestCase):
         self.assertGreater(at_18, at_6)
 
     def test_quote_uses_the_campaign_token_precision(self):
-        make_usdc()
+        make_funding_token()
         user = make_user("feeuser", "fee@example.com")
         brand = get_or_create_brand(user, company_name="Fee Co", actor=user)
         quote = quote_campaign_cost(brand, payout_total=Decimal("500"), decimals=6)
@@ -94,7 +100,7 @@ class TokenAllowlistTests(TestCase):
     def test_campaign_paying_an_unlisted_token_is_refused(self):
         """A free-text symbol would let a campaign promise a token the
         distributor does not hold, failing only at claim time."""
-        make_usdc()
+        make_funding_token()
         admin = make_user("admin1", "a1@example.com", is_staff=True)
         with self.assertRaises(RewardEngineError) as ctx:
             create_campaign(
@@ -108,7 +114,7 @@ class TokenAllowlistTests(TestCase):
         self.assertIn("allowlist", str(ctx.exception))
 
     def test_allowlisted_token_is_accepted(self):
-        make_usdc()
+        make_funding_token()
         admin = make_user("admin2", "a2@example.com", is_staff=True)
         campaign = create_campaign(
             created_by=admin,
@@ -117,16 +123,16 @@ class TokenAllowlistTests(TestCase):
             budget=Decimal("100"),
             **campaign_fields(),
         )
-        self.assertEqual(campaign.token_symbol, "USDC")
+        self.assertEqual(campaign.token_symbol, "USDG")
 
     def test_token_allowlisted_on_another_chain_is_still_refused(self):
         """A symbol approved on one chain is not approved on another.
 
-        The chain is populated with USDC, but this campaign asks for a different
+        The chain is populated with USDG, but this campaign asks for a different
         symbol on that same chain — a mismatch that would otherwise only fail at
         claim time.
         """
-        make_usdc(chain_id=46630)
+        make_funding_token(chain_id=46630)
         admin = make_user("admin3", "a3@example.com", is_staff=True)
         with self.assertRaises(RewardEngineError) as ctx:
             create_campaign(
@@ -146,7 +152,7 @@ class FundingBeforeLaunchTests(TestCase):
     """
 
     def test_brand_campaign_cannot_launch_unfunded(self):
-        make_usdc()
+        make_funding_token()
         user = make_user("brand1", "b1@example.com")
         brand = get_or_create_brand(user, company_name="Fund Co", actor=user)
         campaign = create_campaign(
@@ -174,7 +180,7 @@ class FundingBeforeLaunchTests(TestCase):
         self.assertEqual(campaign.status, CampaignStatus.ACTIVE)
 
     def test_partial_funding_still_blocks_launch(self):
-        make_usdc()
+        make_funding_token()
         user = make_user("brand2", "b2@example.com")
         brand = get_or_create_brand(user, company_name="Part Co", actor=user)
         campaign = create_campaign(
@@ -194,9 +200,9 @@ class FundingBeforeLaunchTests(TestCase):
             set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
 
     def test_required_funding_is_budget_plus_fee(self):
-        make_usdc()
+        make_funding_token()
         campaign = make_campaign(
-            budget=Decimal("500"), token_symbol="USDC", chain_id=46630
+            budget=Decimal("500"), token_symbol="USDG", chain_id=46630
         )
         self.assertEqual(required_campaign_funding(campaign), Decimal("575"))
 

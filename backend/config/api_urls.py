@@ -10,7 +10,7 @@ Endpoints described in Spec 02:
 from django.urls import include, path
 
 urlpatterns = [
-    # Brand onboarding and USDC funding sit at /api/v1/brand/ rather than
+    # Brand onboarding and stablecoin funding sit at /api/v1/brand/ rather than
     # nested under campaigns/, because a brand exists before it has any
     # campaign: onboarding must not require a campaign to exist first.
     path("brand/", include("apps.campaigns.brand_urls")),

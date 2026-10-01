@@ -30,6 +30,18 @@ export const SUPPORTED_NETWORKS = [
   },
 ] as const;
 
+/**
+ * The stablecoin brands fund with and creators are paid in.
+ *
+ * One definition, mirrored from `FUNDING_TOKEN_SYMBOL` in
+ * `backend/config/settings/base.py`. Keep the two in step: the backend stamps
+ * it on every deposit and every quote, so a mismatch here would show a brand
+ * a token the platform does not actually record.
+ *
+ * USDG is Paxos's Global Dollar, the stablecoin Robinhood Chain documents.
+ */
+export const FUNDING_TOKEN_SYMBOL = process.env.NEXT_PUBLIC_FUNDING_TOKEN || "USDG";
+
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/campaigns", label: "Campaigns" },

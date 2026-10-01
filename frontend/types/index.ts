@@ -1,6 +1,6 @@
 /**
- * Brand-side types. A brand is the paying customer: it funds campaigns in
- * USDC and creators are paid from that balance.
+ * Brand-side types. A brand is the paying customer: it funds campaigns in the
+ * platform stablecoin (USDG) and creators are paid from that balance.
  */
 
 export type BrandStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
@@ -43,6 +43,10 @@ export interface BrandQuote {
   already_funded: string;
   shortfall: string;
   sufficient: boolean;
+  /** Token the quote is denominated in, from the backend's funding token. */
+  token_symbol?: string;
+  /** Precision of that token, so the UI can confirm the fee matches the chain. */
+  token_decimals?: number;
 }
 
 export interface BrandCampaignFunding {

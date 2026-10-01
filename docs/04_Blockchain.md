@@ -106,19 +106,19 @@ funded first. Revisit once treasury is healthy.
 Listen for `RewardClaimed`, `PlatformFeeAccrued`, `Deposit`, `TreasuryWithdrawal`
 and admin events. Use confirmations appropriate for the chain.
 
-## Brand funding (USDC)
+## Brand funding (USDG)
 
-Brands pay in **USDC** and creators are paid in **USDC**. There is no fiat
+Brands pay in **USDG** and creators are paid in **USDG**. There is no fiat
 conversion anywhere in the system, so the platform is not acting as an exchanger
 and does not take on conversion or custody risk.
 
-USDC is a stablecoin specifically so a creator's $5 is $5 at payout. This is why
+USDG is a stablecoin specifically so a creator's $5 is $5 at payout. This is why
 creators are not paid in the platform token: that would expose the people doing
 the work to a token's price, which is the failure mode the whole payout design
 exists to avoid.
 
 ```
-brand sends USDC  ->  platform holds USDC  ->  creators paid USDC
+brand sends USDG  ->  platform holds USDG  ->  creators paid USDG
                        15% retained as fee
 ```
 
@@ -158,10 +158,10 @@ The same hash on a *different* chain is a different transfer and is allowed.
 ### Payout integrity
 
 Three rules keep the platform from promising money it does not have. Each was
-a real defect found while wiring the USDC rail up.
+a real defect found while wiring the USDG rail up.
 
 **Decimals come from the token, never a default.** `fees.platform_fee` and
-`quote_campaign_cost` take an explicit `decimals` argument. USDC is **6**
+`quote_campaign_cost` take an explicit `decimals` argument. USDG is **6**
 decimals while the platform default is 18, and quoting a fee at 18 invents
 precision the chain does not have — a sub-cent payout would be quoted a
 1.5e-8 fee the contract would never charge. `mark_claim_confirmed` and the
@@ -176,7 +176,7 @@ install); it is never skipped merely because the symbol is absent, which would
 defeat it entirely.
 
 **A campaign cannot launch unfunded.** `set_campaign_status(ACTIVE)` calls
-`require_campaign_funding`, which requires the brand's *confirmed* USDC to
+`require_campaign_funding`, which requires the brand's *confirmed* USDG to
 cover `budget × 1.15`. A PENDING deposit does not count: recording a deposit
 is not crediting it. Without this, creators post, verification approves the
 work, and the payout then fails — the exact failure the funding model exists
@@ -202,22 +202,22 @@ TokenConfig.objects.get_or_create(
     defaults={'address': '<TESTNET ADDRESS>', 'decimals': 18, 'enabled': True})"
 ```
 
-### ⚠️ Robinhood Chain does not document a USDC contract
+### ⚠️ Robinhood Chain does not document a USDG contract
 
 Checked against the chain on 2026-09-27. Robinhood Chain's documented token
-contracts are **WETH** and **USDG** (Global Dollar). No USDC contract is
+contracts are **WETH** and **USDG** (Global Dollar). No USDG contract is
 listed, and the USDG address published in the docs returns **no contract code**
 on testnet (`eth_getCode` → `0x`), which is expected because that address is a
 mainnet address.
 
-So the USDC rail this build assumes cannot be enabled as written. Before going
+So the USDG rail this build assumes cannot be enabled as written. Before going
 further, pick one:
 
 | Option | Consequence |
 | --- | --- |
 | **Use USDG** | Aligns with the chain. USDG is Paxos's Global Dollar, a dollar stablecoin, so the "no volatility for creators" property holds |
-| **Find the real testnet USDC address** | If Robinhood has since deployed one. Must be verified on-chain (`eth_getCode` non-empty, `decimals()` = 6), not copied from a docs page |
-| **Deploy test USDC yourself** | Only for local testing; never for real payouts |
+| **Find the real testnet USDG address** | If Robinhood has since deployed one. Must be verified on-chain (`eth_getCode` non-empty, `decimals()` = 6), not copied from a docs page |
+| **Deploy test USDG yourself** | Only for local testing; never for real payouts |
 
 **Verify any address on-chain before registering it.** A wrong or empty address
 on the allowlist means a campaign that passes validation but cannot pay:

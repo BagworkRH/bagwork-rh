@@ -1,4 +1,4 @@
-"""Brand-facing API: onboarding, USDC funding, and campaign cost quotes.
+"""Brand-facing API: onboarding, stablecoin funding, and campaign cost quotes.
 
 A brand is a paying customer, so these endpoints answer the three questions a
 brand actually has: how do I pay, what does my campaign cost, and what have I
@@ -7,12 +7,14 @@ is no path here by which one brand can read or fund another's account.
 """
 from decimal import Decimal
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.blockchain import fees
 from apps.rewards.exceptions import RewardEngineError
 
 from .funding import (
@@ -41,18 +43,26 @@ def _error(exc):
     return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def _usdc_decimals() -> int:
-    """Precision of the allowlisted USDC token, for fee arithmetic.
+def funding_token_symbol() -> str:
+    """The stablecoin brands fund with and creators are paid in.
 
-    Read from the allowlist rather than assumed: USDC is 6 decimals, while the
-    platform default is 18, and quoting a brand's fee at 18 would produce a
-    number the chain would never charge. Falls back to the allowlist default
-    only when USDC is not yet registered.
+    Read from settings rather than hardcoded so the symbol has one definition.
+    See `FUNDING_TOKEN_SYMBOL` for why this is USDG and not USDC.
+    """
+    return str(getattr(settings, "FUNDING_TOKEN_SYMBOL", "USDG"))
+
+
+def funding_token_decimals() -> int:
+    """Precision of the funding token, from the allowlist.
+
+    Read rather than assumed: the platform default is 18, and quoting a fee at
+    the wrong precision produces a number the chain would never charge. Falls
+    back to the default only when the token is not yet registered.
     """
     from apps.blockchain.models import TokenConfig  # noqa: PLC0415 - lazy: avoids a cycle
 
-    token = TokenConfig.objects.filter(symbol__iexact="USDC").first()
-    return token.decimals if token else 6
+    token = TokenConfig.objects.filter(symbol__iexact=funding_token_symbol()).first()
+    return token.decimals if token else fees.DEFAULT_DECIMALS
 
 
 @api_view(["GET", "POST"])
@@ -124,7 +134,7 @@ def brand_funding(request):
             amount=request.data.get("amount"),
             chain_id=request.data.get("chain_id"),
             tx_hash=request.data.get("tx_hash"),
-            token_symbol=request.data.get("token_symbol", "USDC"),
+            token_symbol=request.data.get("token_symbol", funding_token_symbol()),
             actor=request.user,
         )
     except RewardEngineError as exc:
@@ -174,8 +184,9 @@ def brand_quote(request):
             {"payout_total": ["Must be greater than zero."]},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    decimals = _usdc_decimals()
+    decimals = funding_token_decimals()
     quote = quote_campaign_cost(brand, payout_total=payout_total, decimals=decimals)
+    quote["token_symbol"] = funding_token_symbol()
     quote["token_decimals"] = decimals
     return Response(quote)
 

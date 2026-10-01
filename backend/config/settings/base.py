@@ -262,6 +262,21 @@ EIP712_DOMAIN_NAME = os.environ.get("EIP712_DOMAIN_NAME", "bagworkRH")
 CLAIM_SIGNER = os.environ.get("CLAIM_SIGNER", "")
 CLAIM_SIGNER_ADDRESS = os.environ.get("CLAIM_SIGNER_ADDRESS", "")
 DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
+# The stablecoin brands fund with and creators are paid in. One symbol, one
+# source of truth: it was previously written as a literal in the funding model,
+# the quote endpoint and the frontend, which is how a token rename becomes a
+# multi-file sweep that quietly misses a spot.
+#
+# USDG is Paxos's Global Dollar, a dollar-denominated stablecoin, chosen
+# because it is the stablecoin Robinhood Chain actually documents (alongside
+# WETH). No USDC contract is published for this chain, so a USDC rail could not
+# have been enabled as written. The substance is unchanged: a dollar stablecoin
+# means a creator's payout holds its value and the platform never converts to
+# fiat, so it is not acting as an exchanger.
+#
+# Must be allowlisted for the campaign's chain, or campaigns paying in it are
+# refused at creation (see campaigns.services._validate_token_allowed).
+FUNDING_TOKEN_SYMBOL = os.environ.get("FUNDING_TOKEN_SYMBOL", "USDG")
 # Platform fee in basis points, charged on top of the creator payout and never
 # deducted from it (must match RewardDistributor.PLATFORM_FEE_BPS = 1500).
 # 1500 = 15%: a $5 payout costs a brand $5.75, the creator still receives $5.

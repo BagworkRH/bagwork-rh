@@ -1,8 +1,15 @@
-"""Brand funding: USDC deposits, the platform fee, and funded balance.
+"""Brand funding: stablecoin deposits, the platform fee, and funded balance.
 
-A brand funds its campaigns by sending USDC. The platform holds that USDC and
-pays creators in USDC from it — there is no fiat conversion anywhere, so the
-platform is not acting as an exchanger.
+A brand funds its campaigns by sending stablecoin, and the platform pays
+creators in the same stablecoin from it — there is no fiat conversion anywhere,
+so the platform is not acting as an exchanger.
+
+The token is USDG (Paxos Global Dollar), the stablecoin Robinhood Chain
+documents. Being dollar-denominated is the point: a creator's payout holds its
+value and does not expose them to a token's price, which is why creators are
+not paid in the platform token. The symbol comes from
+`settings.FUNDING_TOKEN_SYMBOL` so there is one definition rather than a
+literal repeated across files.
 
 The 15% platform fee is charged here, on the brand's deposit, and is NOT taken
 from a creator's payout. The arithmetic is imported from
@@ -12,6 +19,7 @@ misquote real money.
 """
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -23,6 +31,11 @@ from apps.rewards.exceptions import RewardEngineError
 from .models import BrandFunding, BrandProfile, BrandStatus, FundingStatus
 
 TX_HASH_LENGTH = 66
+
+
+def funding_token_symbol() -> str:
+    """The stablecoin brands fund with and creators are paid in."""
+    return str(getattr(settings, "FUNDING_TOKEN_SYMBOL", "USDG"))
 
 
 class DuplicateFundingError(RewardEngineError):
@@ -67,11 +80,11 @@ def record_funding(  # noqa: PLR0913 - an explicit funding record
     amount,
     chain_id,
     tx_hash,
-    token_symbol="USDC",
+    token_symbol=None,
     campaign=None,
     actor=None,
 ) -> BrandFunding:
-    """Record a USDC deposit as funding.
+    """Record a stablecoin deposit as funding.
 
     The deposit is stored as PENDING. A separate confirmation step — which
     requires an on-chain check — marks it CONFIRMED, and only confirmed
@@ -93,7 +106,7 @@ def record_funding(  # noqa: PLR0913 - an explicit funding record
                 brand=brand,
                 amount=amount,
                 chain_id=int(chain_id),
-                token_symbol=token_symbol,
+                token_symbol=token_symbol or funding_token_symbol(),
                 tx_hash=tx_hash,
                 campaign=campaign,
                 status=FundingStatus.PENDING,
@@ -153,7 +166,7 @@ def _confirmed_total(queryset) -> Decimal:
 
 
 def confirmed_funded_balance(brand, *, campaign=None) -> Decimal:
-    """USDC confirmed and available to fund payouts.
+    """Stablecoin confirmed and available to fund payouts.
 
     Unallocated deposits count once, never once per campaign, so a single
     deposit cannot be spent across several campaigns and a brand's balance
@@ -183,7 +196,7 @@ def confirmed_funded_balance(brand, *, campaign=None) -> Decimal:
 
 
 def required_campaign_funding(campaign) -> Decimal:
-    """USDC a campaign needs on deposit before it may go live.
+    """Stablecoin a campaign needs on deposit before it may go live.
 
     Budget is the sum of creator payouts the campaign promises, so the deposit
     required is that budget plus the platform fee. A campaign that is not
@@ -227,7 +240,7 @@ def require_campaign_funding(campaign) -> None:
 
     Called when a campaign goes live. This is the "who provides the money"
     question answered in code rather than in a policy document: a campaign
-    cannot accept creators until the brand's confirmed USDC covers the payouts
+    cannot accept creators until the brand's confirmed stablecoin covers the
     it promises.
     """
     if campaign.funding_brand is None:
@@ -250,9 +263,9 @@ def quote_campaign_cost(brand, *, payout_total, decimals=None) -> dict:
     on top, exactly as `requiredDeposit` does on chain. A brand is therefore
     never quoted a total the contract would reject as under-funded.
 
-    `decimals` must be the payout token's precision — for USDC that is 6, not
-    the 18 default. Quoting at the wrong precision produces a fee the chain
-    would never charge.
+    `decimals` must be the payout token's precision, read from the allowlist.
+    Quoting at the wrong precision produces a fee the chain would never
+    charge.
     """
     payout_total = Decimal(str(payout_total))
     fee = fees.platform_fee(payout_total, decimals)

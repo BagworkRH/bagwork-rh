@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import * as brandApi from "@/services/brand";
-import { shortenAddress } from "@/lib/constants";
+import { FUNDING_TOKEN_SYMBOL, shortenAddress } from "@/lib/constants";
 import type {
   BrandCampaignFunding,
   BrandFunding,
@@ -13,7 +13,7 @@ import type {
 } from "@/types";
 
 /**
- * Brand dashboard: onboarding, USDC funding, and campaign cost.
+ * Brand dashboard: onboarding, stablecoin funding, and campaign cost.
  *
  * A brand is the paying customer, so this surface is deliberately separate from
  * the seller dashboard: a brand's balance is money it has committed, not money
@@ -120,8 +120,8 @@ export default function BrandDashboardPage() {
 
       <div className="stat-strip" style={{ marginTop: 20 }}>
         <div className="stat-box">
-          <div className="num">{formatUsdc(balance)}</div>
-          <div className="muted">Confirmed USDC balance</div>
+          <div className="num">{formatAmount(balance)}</div>
+          <div className="muted">Confirmed {FUNDING_TOKEN_SYMBOL} balance</div>
         </div>
         <div className="stat-box">
           <div className="num">{String(campaigns.length)}</div>
@@ -152,7 +152,7 @@ export default function BrandDashboardPage() {
                   <strong>{c.name}</strong>
                   <span className="muted">
                     {" "}
-                    — {formatUsdc(c.funded)} funded of {formatUsdc(c.budget)} budget
+                    — {formatAmount(c.funded)} funded of {formatAmount(c.budget)} budget
                     ({c.status})
                   </span>
                 </li>
@@ -175,10 +175,10 @@ function statusHint(status: string): string {
   return "Your brand is pending review. You can prepare funding, but staff activate brands after onboarding.";
 }
 
-/** Format a USDC amount for display. Trims trailing zeros: the API returns
+/** Format a stablecoin amount for display. Trims trailing zeros: the API returns
  *  18-decimal strings because the fee arithmetic runs in token units, and
  *  showing "575.000000000000000000" would read as a bug to a brand. */
-function formatUsdc(value: string): string {
+function formatAmount(value: string): string {
   const num = Number(value);
   if (!Number.isFinite(num)) return value;
   return num.toLocaleString(undefined, {
@@ -224,7 +224,7 @@ function BrandOnboard({
     <div className="container section" style={{ maxWidth: 680 }}>
       <h1>Set up your brand</h1>
       <p className="muted">
-        Brands fund campaigns in USDC and are charged only for verified, original,
+        Brands fund campaigns in {FUNDING_TOKEN_SYMBOL} and are charged only for verified, original,
         disclosed posts. Creators are paid in full from your deposit.
       </p>
 
@@ -266,7 +266,7 @@ function BrandOnboard({
 }
 
 /**
- * Funding panel: record a USDC deposit and confirm it.
+ * Funding panel: record a stablecoin deposit and confirm it.
  *
  * The two-step flow is deliberate and the copy says so. Recording a deposit
  * does not credit it; only confirmation does. Presenting a pending deposit as
@@ -296,7 +296,7 @@ function FundingPanel({
         amount,
         chain_id: Number(chainId),
         tx_hash: txHash.trim(),
-        token_symbol: "USDC",
+        token_symbol: FUNDING_TOKEN_SYMBOL,
       });
       setNotice(
         "Deposit recorded. It does not count toward your balance until confirmed below."
@@ -327,9 +327,9 @@ function FundingPanel({
 
   return (
     <div className="card" style={{ marginTop: 20 }}>
-      <h3>Fund with USDC</h3>
+      <h3>Fund with {FUNDING_TOKEN_SYMBOL}</h3>
       <p className="muted">
-        Send USDC on Robinhood Chain, then record the transaction here. A recorded
+        Send {FUNDING_TOKEN_SYMBOL} on Robinhood Chain, then record the transaction here. A recorded
         deposit stays pending until it is confirmed on-chain — it never counts as
         spendable budget before then.
       </p>
@@ -337,7 +337,7 @@ function FundingPanel({
       <form onSubmit={handleRecord}>
         <div className="grid grid-3">
           <label className="field">
-            Amount (USDC)
+            Amount ({FUNDING_TOKEN_SYMBOL})
             <input
               type="text"
               inputMode="decimal"
@@ -381,7 +381,7 @@ function FundingPanel({
           <ul className="stats-list">
             {fundings.map((f) => (
               <li key={f.id}>
-                <strong>{formatUsdc(f.amount)}</strong>
+                <strong>{formatAmount(f.amount)}</strong>
                 <span className="muted"> on chain {f.chain_id} · </span>
                 <code className="wallet-chip">{shortenAddress(f.tx_hash)}</code>{" "}
                 {f.status === "CONFIRMED" ? (
@@ -443,7 +443,7 @@ function QuotePanel() {
 
       <form onSubmit={handleQuote}>
         <label className="field">
-          Total creator payouts (USDC)
+          Total creator payouts ({FUNDING_TOKEN_SYMBOL})
           <input
             type="text"
             inputMode="decimal"
@@ -464,27 +464,27 @@ function QuotePanel() {
         <ul className="stats-list" style={{ marginTop: 12 }}>
           <li>
             <span className="muted">Creator payouts</span>{" "}
-            <strong>{formatUsdc(quote.payout_total)}</strong>
+            <strong>{formatAmount(quote.payout_total)}</strong>
           </li>
           <li>
             <span className="muted">
               Platform fee ({quote.platform_fee_bps / 100}%)
             </span>{" "}
-            <strong>{formatUsdc(quote.platform_fee)}</strong>
+            <strong>{formatAmount(quote.platform_fee)}</strong>
           </li>
           <li>
             <span className="muted">Total to fund</span>{" "}
-            <strong>{formatUsdc(quote.total_required)}</strong>
+            <strong>{formatAmount(quote.total_required)}</strong>
           </li>
           <li>
             <span className="muted">Your confirmed balance</span>{" "}
-            <strong>{formatUsdc(quote.already_funded)}</strong>
+            <strong>{formatAmount(quote.already_funded)}</strong>
           </li>
           <li>
             {quote.sufficient ? (
               <span className="badge badge-ok">Funded</span>
             ) : (
-              <span className="badge">Short by {formatUsdc(quote.shortfall)}</span>
+              <span className="badge">Short by {formatAmount(quote.shortfall)}</span>
             )}
           </li>
         </ul>

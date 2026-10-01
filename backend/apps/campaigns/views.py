@@ -56,7 +56,7 @@ def campaign_launch(request, slug):
     """Publish a draft campaign so creators can join it.
 
     Staff may launch any campaign. A brand may launch only its own, and only
-    once its confirmed USDC covers the budget plus the platform fee — the
+    once its confirmed stablecoin covers the budget plus the fee — the
     funding check in `set_campaign_status` is what stops an unfunded campaign
     from taking creators' work. Restricting this to staff instead would make
     brands unable to use the platform they are paying for.

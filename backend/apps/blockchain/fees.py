@@ -21,8 +21,9 @@ ONE = Decimal(1)
 
 # Fallback only. Real callers pass the token's own decimals; this exists so a
 # bare arithmetic call still works, but relying on it for a real token is a
-# bug: USDC is 6 decimals, not 18, and quoting a fee at the wrong precision
-# makes the backend disagree with the contract.
+# bug: stablecoins are commonly 6 decimals while the platform default is 18,
+# and quoting a fee at the wrong precision makes the backend disagree with
+# the contract. Always pass the token's own decimals.
 DEFAULT_DECIMALS = 18
 
 

@@ -1,4 +1,4 @@
-"""Brand onboarding and USDC funding.
+"""Brand onboarding and USDG funding.
 
 The cases that matter most here are the ones where the platform could be made
 to believe it has money it does not: a replayed deposit, a cross-brand read,
