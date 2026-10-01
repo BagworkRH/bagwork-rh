@@ -187,12 +187,52 @@ development campaigns still launch. Brands may create and launch their own
 campaigns; the funding gate, not a staff-only permission, is what stops an
 unfunded one going live.
 
+### Registering the payout token
+
+The token allowlist is what `Campaign.token_symbol` is checked against, so a
+campaign cannot pay in a token the distributor does not hold. There is no
+management command yet — register via Django admin at `/admin/` (TokenConfig),
+or from a shell:
+
 ```bash
 python manage.py shell -c "
 from apps.blockchain.models import TokenConfig
-TokenConfig.objects.update_or_create(symbol='USDC', chain_id=46630, defaults={
-    'address': '0x...', 'decimals': 6, 'enabled': True})"
+TokenConfig.objects.get_or_create(
+    symbol='USDG', chain_id=46630,
+    defaults={'address': '<TESTNET ADDRESS>', 'decimals': 18, 'enabled': True})"
 ```
+
+### ⚠️ Robinhood Chain does not document a USDC contract
+
+Checked against the chain on 2026-09-27. Robinhood Chain's documented token
+contracts are **WETH** and **USDG** (Global Dollar). No USDC contract is
+listed, and the USDG address published in the docs returns **no contract code**
+on testnet (`eth_getCode` → `0x`), which is expected because that address is a
+mainnet address.
+
+So the USDC rail this build assumes cannot be enabled as written. Before going
+further, pick one:
+
+| Option | Consequence |
+| --- | --- |
+| **Use USDG** | Aligns with the chain. USDG is Paxos's Global Dollar, a dollar stablecoin, so the "no volatility for creators" property holds |
+| **Find the real testnet USDC address** | If Robinhood has since deployed one. Must be verified on-chain (`eth_getCode` non-empty, `decimals()` = 6), not copied from a docs page |
+| **Deploy test USDC yourself** | Only for local testing; never for real payouts |
+
+**Verify any address on-chain before registering it.** A wrong or empty address
+on the allowlist means a campaign that passes validation but cannot pay:
+
+```python
+from web3 import Web3
+w3 = Web3(Web3.HTTPProvider('https://rpc.testnet.chain.robinhood.com'))
+addr = Web3.to_checksum_address('<ADDRESS>')
+assert len(w3.eth.get_code(addr)) > 2, 'no contract at this address'
+print('decimals =', w3.eth.call({'to': addr, 'data': '0x313ce567'}).hex())
+```
+
+`decimals()` must match what you register. Getting this wrong is exactly the
+class of bug the decimals fix addressed — a quote computed at the wrong
+precision is a quote the chain will not honour.
 
 ## Treasury
 Admin treasury separated from app wallets. Multisig for meaningful balances.
