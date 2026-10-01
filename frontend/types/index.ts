@@ -1,3 +1,64 @@
+/**
+ * Brand-side types. A brand is the paying customer: it funds campaigns in
+ * USDC and creators are paid from that balance.
+ */
+
+export type BrandStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
+
+export type FundingStatus = "PENDING" | "CONFIRMED" | "REJECTED";
+
+export interface BrandProfile {
+  id: number;
+  company_name: string;
+  contact_email: string;
+  funding_wallet: string;
+  status: BrandStatus;
+  created_at: string;
+  /** Served by the profile endpoint only; derived from confirmed deposits. */
+  funded_balance?: string;
+}
+
+export interface BrandFunding {
+  id: number;
+  amount: string;
+  chain_id: number;
+  token_symbol: string;
+  tx_hash: string;
+  status: FundingStatus;
+  campaign: number | null;
+  funded_at: string;
+  confirmed_at: string | null;
+}
+
+export interface BrandFundingList {
+  fundings: BrandFunding[];
+  confirmed_balance: string;
+}
+
+export interface BrandQuote {
+  payout_total: string;
+  platform_fee: string;
+  platform_fee_bps: number;
+  total_required: string;
+  already_funded: string;
+  shortfall: string;
+  sufficient: boolean;
+}
+
+export interface BrandCampaignFunding {
+  slug: string;
+  name: string;
+  status: CampaignStatus;
+  budget: string;
+  remaining_budget: string;
+  funded: string;
+}
+
+export interface BrandCampaignList {
+  campaigns: BrandCampaignFunding[];
+  confirmed_balance: string;
+}
+
 /** Shared API types (mirror Spec 02 endpoints). */
 
 export interface User {

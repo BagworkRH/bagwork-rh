@@ -35,6 +35,10 @@ export const NAV_LINKS = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/dashboard", label: "Dashboard" },
+  // Brands fund campaigns rather than earn from them, so they get a separate
+  // surface. Linking it from the main nav is what makes the platform usable by
+  // both sides without conflating a brand's balance with a creator's earnings.
+  { href: "/brand", label: "For Brands" },
   { href: "/help", label: "Help" },
 ] as const;
 
