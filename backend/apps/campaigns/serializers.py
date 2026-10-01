@@ -3,7 +3,49 @@ from rest_framework import serializers
 
 from apps.rewards.exceptions import RewardEngineError
 
-from .models import Campaign, CampaignParticipation, RewardModel
+from .models import (
+    BrandFunding,
+    BrandProfile,
+    Campaign,
+    CampaignParticipation,
+    RewardModel,
+)
+
+
+class BrandProfileSerializer(serializers.ModelSerializer):
+    """A brand's own profile. No balance here: balance is derived from
+    confirmed deposits and is served by the funding endpoints."""
+
+    class Meta:
+        model = BrandProfile
+        fields = (
+            "id",
+            "company_name",
+            "contact_email",
+            "funding_wallet",
+            "status",
+            "created_at",
+        )
+        # A brand cannot promote itself to ACTIVE or re-point its own status;
+        # activation is a staff decision once onboarding is reviewed.
+        read_only_fields = ("id", "status", "created_at")
+
+
+class BrandFundingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrandFunding
+        fields = (
+            "id",
+            "amount",
+            "chain_id",
+            "token_symbol",
+            "tx_hash",
+            "status",
+            "campaign",
+            "funded_at",
+            "confirmed_at",
+        )
+        read_only_fields = ("id", "status", "funded_at", "confirmed_at")
 
 
 class CampaignSerializer(serializers.ModelSerializer):

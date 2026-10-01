@@ -106,6 +106,55 @@ funded first. Revisit once treasury is healthy.
 Listen for `RewardClaimed`, `PlatformFeeAccrued`, `Deposit`, `TreasuryWithdrawal`
 and admin events. Use confirmations appropriate for the chain.
 
+## Brand funding (USDC)
+
+Brands pay in **USDC** and creators are paid in **USDC**. There is no fiat
+conversion anywhere in the system, so the platform is not acting as an exchanger
+and does not take on conversion or custody risk.
+
+USDC is a stablecoin specifically so a creator's $5 is $5 at payout. This is why
+creators are not paid in the platform token: that would expose the people doing
+the work to a token's price, which is the failure mode the whole payout design
+exists to avoid.
+
+```
+brand sends USDC  ->  platform holds USDC  ->  creators paid USDC
+                       15% retained as fee
+```
+
+The 15% platform fee applies exactly as in the contract: charged on top of the
+payout, never deducted from it. `apps/campaigns/funding.py` imports the
+arithmetic from `apps/blockchain/fees.py` rather than reimplementing it, so a
+quote given to a brand is identical to what `requiredDeposit` accepts on chain.
+
+### Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET/POST /api/v1/brand/profile/` | Read or create the caller's brand |
+| `GET/POST /api/v1/brand/funding/` | List deposits / record a new one |
+| `POST /api/v1/brand/funding/<id>/confirm/` | Confirm a deposit on-chain |
+| `POST /api/v1/brand/quote/` | Cost of a campaign, fee included |
+| `GET /api/v1/brand/campaigns/` | Campaigns this brand funds |
+
+Every endpoint is scoped to the signed-in user's own brand. Confirmation
+re-checks ownership on the object rather than trusting the URL, so a brand
+cannot credit another brand's deposit by guessing an id.
+
+### Two rules that protect real money
+
+**Recording is not crediting.** A deposit is stored `PENDING` and does not
+count toward a balance until confirmed against the chain. Crediting money
+because a client said it arrived is just the client asserting that.
+
+**One transfer, one credit.** `tx_hash` is unique per `(chain_id, tx_hash)` at
+the database level, so a replayed or resubmitted deposit cannot inflate a
+balance even if a future code path bypasses the service-level check. The
+service check exists only to return a readable error; the constraint is the
+actual guard.
+
+The same hash on a *different* chain is a different transfer and is allowed.
+
 ## Treasury
 Admin treasury separated from app wallets. Multisig for meaningful balances.
 No keys in source code; secure signing system in production. Don't hold user

@@ -87,6 +87,103 @@ class Campaign(models.Model):
         self.save(update_fields=["discovery_watermarks", "updated_at"])
 
 
+class BrandStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    ACTIVE = "ACTIVE", "Active"
+    SUSPENDED = "SUSPENDED", "Suspended"
+
+
+class BrandProfile(models.Model):
+    """A brand is the paying customer: the company that funds a campaign.
+
+    Separate from SellerProfile because a brand has the opposite interest.
+    A seller wants to be paid; a brand wants verifiable work for the least
+    money and can end a campaign. A user may hold one of each, and holding
+    both is legitimate (a company running its own creator campaign), so
+    neither is derived from the other.
+    """
+
+    user = models.OneToOneField(
+        "accounts.User", on_delete=models.CASCADE, related_name="brand_profile"
+    )
+    company_name = models.CharField(max_length=255)
+    # Human-facing contact. Not an authentication factor; auth stays on User.
+    contact_email = models.EmailField(blank=True)
+    # This brand's on-chain address, used to attribute incoming USDC.
+    funding_wallet = models.CharField(max_length=42, blank=True)
+    status = models.CharField(
+        max_length=16, choices=BrandStatus.choices, default=BrandStatus.PENDING
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.company_name} ({self.user.email})"
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == BrandStatus.ACTIVE
+
+
+class FundingStatus(models.TextChoices):
+    PENDING = "PENDING", "Awaiting confirmation"
+    CONFIRMED = "CONFIRMED", "Confirmed"
+    REJECTED = "REJECTED", "Rejected"
+
+
+class BrandFunding(models.Model):
+    """A USDC deposit funding a brand's campaign payouts.
+
+    Brands pay in USDC and creators are paid in USDC, so the platform never
+    converts to fiat and never becomes an exchanger. USDC is a stablecoin
+    precisely so a creator's $5 is $5 at payout, with none of the volatility
+    that made paying creators in the platform token unacceptable.
+
+    Replay protection is the load-bearing concern: a deposit is credited from
+    an on-chain transfer, and the same transfer must never fund two campaigns
+    or be re-submitted to inflate a balance. `tx_hash` is therefore unique per
+    chain, which makes double-crediting impossible at the database level
+    rather than relying on application logic staying correct.
+    """
+
+    brand = models.ForeignKey(BrandProfile, on_delete=models.PROTECT, related_name="fundings")
+    amount = models.DecimalField(max_digits=40, decimal_places=6)
+    chain_id = models.PositiveIntegerField()
+    token_symbol = models.CharField(max_length=16, default="USDC")
+    tx_hash = models.CharField(max_length=66)
+    status = models.CharField(
+        max_length=16, choices=FundingStatus.choices, default=FundingStatus.PENDING
+    )
+    # Optional allocation to one campaign. Null = unallocated brand balance,
+    # available to the brand's next campaign.
+    campaign = models.ForeignKey(
+        "campaigns.Campaign", on_delete=models.PROTECT, related_name="fundings", null=True, blank=True
+    )
+    funded_at = models.DateTimeField(default=timezone.now)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-funded_at"]
+        constraints = [
+            # A given on-chain transfer can be recorded once, ever. The
+            # application-level check is only a fast path for a friendlier
+            # error message; this constraint is what actually prevents it.
+            models.UniqueConstraint(
+                fields=["chain_id", "tx_hash"], name="unique_funding_per_chain_tx"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.amount} {self.token_symbol} for {self.brand.company_name} ({self.status})"
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.status == FundingStatus.CONFIRMED
+
+
 class ParticipationStatus(models.TextChoices):
     ACTIVE = "ACTIVE", "Active"
     LEFT = "LEFT", "Left"
