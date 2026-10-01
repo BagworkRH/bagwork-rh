@@ -99,10 +99,14 @@ export DEPLOYER_PRIVATE_KEY=0xYOUR_TESTNET_KEY
 npx hardhat run scripts/deploy.ts --network robinhoodTestnet
 ```
 
-The script deploys `RewardToken` then `RewardDistributor(token, signer)` and
-prints every address you need. It **refuses to run** if the EIP-712 domain name
-in the contract does not match `EIP712_DOMAIN_NAME` (default `bagworkRH`) —
-see §9.
+The script deploys `RewardToken` then
+`RewardDistributor(token, signer, treasury)` and prints every address you need.
+It **refuses to run** if the EIP-712 domain name in the contract does not match
+`EIP712_DOMAIN_NAME` (default `bagworkRH`) — see §9.
+
+Set `TREASURY_ADDRESS` to a **multisig** before mainnet. If it is unset the
+script falls back to the deployer EOA and prints a warning, because a deployer
+key that can also withdraw fees is a single point of failure for the treasury.
 
 Record:
 
@@ -111,6 +115,7 @@ Record:
 | `CHAIN_ID` | `46630` |
 | `REWARD_TOKEN_ADDRESS` | printed by the script |
 | `CONTRACT_ADDRESS` | printed by the script |
+| `TREASURY_ADDRESS` | printed by the script (multisig on mainnet) |
 | `CLAIM_SIGNER_ADDRESS` | printed by the script |
 | `CLAIM_SIGNER` | the deployer key (testnet only) |
 

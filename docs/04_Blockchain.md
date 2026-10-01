@@ -52,14 +52,65 @@ nonce, expiry/deadline, chain ID, contract address/domain separation.
 Transaction states: CREATED · SIGNING · SUBMITTED · PENDING · CONFIRMED ·
 FAILED · REPLACED · EXPIRED.
 
+## Platform fee (15%)
+
+Brands pay a **15% platform fee, charged on top of the creator payout**. It is
+never deducted from what a creator receives.
+
+```
+brand deposits   payout + 15% fee
+creator receives payout          <- always the exact signed amount
+treasury         15% fee
+```
+
+**Why this is the load-bearing rule.** A creator is promised a fixed amount for
+verified, disclosed work. Deducting the fee from that amount means a creator
+receives less than advertised for work they already did, and word travels fast
+in creator communities. Reducing the *number of funded claims* instead leaves
+every creator whole.
+
+A $2,500 campaign at a $5 payout funds **434 posts** (434 × $5.75 = $2,495.50),
+each creator paid the full $5. It does **not** fund 500 posts at $4.25.
+
+**Where it lives**
+
+| Piece | Location |
+| --- | --- |
+| `PLATFORM_FEE_BPS = 1500` | `RewardDistributor.sol` (immutable constant) |
+| `PLATFORM_FEE_BPS` setting | `config/settings/base.py` (mirrors the contract) |
+| `feeFor` / `requiredDeposit` | `RewardDistributor.sol` + `apps/blockchain/fees.py` |
+| `FEE_ACCRUED` ledger entry | written on claim confirmation |
+
+The brand quote is computed server-side in `apps/blockchain/fees.py` with
+integer smallest-unit math that mirrors Solidity's flooring division, so a
+brand is never quoted a unit more than the contract would accept.
+
+**Solvency.** Each claim checks
+`totalDeposited − totalPaid − totalFeesAccrued + totalFeesWithdrawn ≥ payout + fee`
+and reverts with `InsufficientEscrow` otherwise. An under-funded escrow can
+therefore never quietly pay a creator less than signed, and never consume funds
+owed to other creators.
+
+**Treasury withdrawals are bounded** by fees actually accrued
+(`withdrawTreasury`, reverting `TreasuryUnderfunded`). The previous
+`withdraw(uint256)` could move any token held by the contract — including
+escrow still owed to creators — so an owner-key compromise drained every pending
+payout. The old function was removed rather than left alongside the safe one.
+
+**No burn.** `RewardToken` exposes `burn`/`burnFrom` for a future fee-burn, but
+nothing calls them. Creators are paid in fiat, and the concrete cost to fund
+today (a security audit, plus a securities opinion before any token launch) is
+funded first. Revisit once treasury is healthy.
+
 ## Event listener
-Listen for `RewardClaimed`, `Deposit`, withdrawal/admin events. Use
-confirmations appropriate for the chain.
+Listen for `RewardClaimed`, `PlatformFeeAccrued`, `Deposit`, `TreasuryWithdrawal`
+and admin events. Use confirmations appropriate for the chain.
 
 ## Treasury
 Admin treasury separated from app wallets. Multisig for meaningful balances.
 No keys in source code; secure signing system in production. Don't hold user
-funds unnecessarily.
+funds unnecessarily. Set `TREASURY_ADDRESS` to a multisig on mainnet so the
+deployer key is not also the fee withdrawal key.
 
 ## Token support
 Per campaign: chain ID, token contract address, symbol, decimals, reward

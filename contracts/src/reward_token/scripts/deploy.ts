@@ -49,6 +49,16 @@ async function main() {
     );
   }
   console.log("Deploying contracts with account:", deployer.address);
+
+  // Treasury must be a multisig in production, never the deployer EOA, so a
+  // compromised deployer key cannot also control the fee money.
+  const treasuryAddress = process.env.TREASURY_ADDRESS || deployer.address;
+  if (!process.env.TREASURY_ADDRESS) {
+    console.warn(
+      "WARNING: TREASURY_ADDRESS unset — fees will be sent to the deployer EOA.\n" +
+        "         Set TREASURY_ADDRESS to a multisig before mainnet.",
+    );
+  }
   console.log("Network:", network.name);
   const chainId = (await ethers.provider.getNetwork()).chainId;
   console.log("Chain ID:", chainId.toString());
@@ -60,11 +70,21 @@ async function main() {
   console.log("RewardToken deployed to:", tokenAddress);
 
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-  const distributor = await RewardDistributor.deploy(tokenAddress, deployer.address);
+  const distributor = await RewardDistributor.deploy(
+    tokenAddress,
+    deployer.address,
+    treasuryAddress,
+  );
   await distributor.waitForDeployment();
   const distributorAddress = await distributor.getAddress();
   console.log("RewardDistributor deployed to:", distributorAddress);
   console.log("Signer:", deployer.address);
+  console.log("Treasury:", treasuryAddress);
+
+  // Surface the fee economics at deploy time so the deployed numbers are never
+  // a surprise for the first brand or creator.
+  const bps = await distributor.PLATFORM_FEE_BPS();
+  console.log(`Platform fee: ${bps.toString()} bps (${Number(bps) / 100}%)`);
 
   // Read back the on-chain domain separator so it can be cross-checked against
   // the backend's build_domain_separator() for this chain id and address.
@@ -76,7 +96,12 @@ async function main() {
   console.log(`REWARD_TOKEN_ADDRESS=${tokenAddress}`);
   console.log(`CONTRACT_ADDRESS=${distributorAddress}`);
   console.log(`CLAIM_SIGNER_ADDRESS=${deployer.address}`);
+  console.log(`TREASURY_ADDRESS=${treasuryAddress}`);
   console.log(`CLAIM_SIGNER=<the private key for ${deployer.address}>`);
+  console.log(
+    "\nFunding model: a brand deposits payout + 15% fee per claim. Creators are " +
+      "paid the full signed payout in fiat; fees accrue to treasury.",
+  );
 }
 
 main().catch((error) => {

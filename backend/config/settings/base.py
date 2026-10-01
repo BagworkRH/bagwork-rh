@@ -262,6 +262,10 @@ EIP712_DOMAIN_NAME = os.environ.get("EIP712_DOMAIN_NAME", "bagworkRH")
 CLAIM_SIGNER = os.environ.get("CLAIM_SIGNER", "")
 CLAIM_SIGNER_ADDRESS = os.environ.get("CLAIM_SIGNER_ADDRESS", "")
 DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
+# Platform fee in basis points, charged on top of the creator payout and never
+# deducted from it (must match RewardDistributor.PLATFORM_FEE_BPS = 1500).
+# 1500 = 15%: a $5 payout costs a brand $5.75, the creator still receives $5.
+PLATFORM_FEE_BPS = int(os.environ.get("PLATFORM_FEE_BPS", "1500"))
 
 # Fraud/risk review queue (Spec 03 anti-fraud). Signals scoring at or above this
 # threshold are queued for human review; nothing is ever actioned automatically.

@@ -6,6 +6,7 @@ their "disabled" branch because no node is reachable from the test suite.
 """
 from decimal import Decimal
 
+from django.db.models import Sum
 from django.test import TestCase
 from eth_abi import encode as abi_encode
 from eth_utils import to_canonical_address, to_checksum_address
@@ -151,3 +152,43 @@ class ReconciliationTests(TestCase):
         self.assertEqual(internal_claimed_total(token), Decimal("0"))
         mark_claim_confirmed(claim, "0x" + "ef" * 32)
         self.assertEqual(internal_claimed_total(token), Decimal("5.000000000000000000"))
+
+
+
+class PlatformFeeLedgerTests(TestCase):
+    """The 15% fee is booked as a separate treasury credit, never deducted
+    from the creator's payout line (Spec 04)."""
+
+    def test_fee_is_a_separate_ledger_entry_and_creator_keeps_full_payout(self):
+        make_token_config(symbol="TST", address=TOKEN)
+        _, _, _, claim = setup_claim(with_token=False)
+        mark_claim_confirmed(claim, "0x" + "ab" * 32)
+
+        creator_line = LedgerEntry.objects.get(
+            action=LedgerAction.CLAIM_CONFIRMED, claim=claim
+        )
+        fee_line = LedgerEntry.objects.get(
+            action=LedgerAction.FEE_ACCRUED, claim=claim
+        )
+
+        # The creator is credited the FULL signed amount, never a reduced one.
+        self.assertEqual(creator_line.amount, Decimal("5.000000000000000000"))
+        # The fee is 15% of the payout, in its own entry.
+        self.assertEqual(fee_line.amount, Decimal("0.750000000000000000"))
+        # Both reference the same on-chain transaction for reconciliation.
+        self.assertEqual(creator_line.transaction_hash, fee_line.transaction_hash)
+
+    def test_fee_never_shrinks_creator_credited_total(self):
+        token = make_token_config(symbol="TST", address=TOKEN)
+        _, _, _, claim = setup_claim(with_token=False)
+        mark_claim_confirmed(claim, "0x" + "cd" * 32)
+
+        # The reconciliation figure is creator payouts only, so introducing the
+        # fee must not change what the platform owes creators.
+        self.assertEqual(
+            internal_claimed_total(token), Decimal("5.000000000000000000")
+        )
+        fee_total = LedgerEntry.objects.filter(
+            action=LedgerAction.FEE_ACCRUED
+        ).aggregate(total=Sum("amount"))["total"]
+        self.assertEqual(fee_total, Decimal("0.750000000000000000"))

@@ -49,6 +49,7 @@ class LedgerAction(models.TextChoices):
     CLAIM_CREATED = "CLAIM_CREATED", "Claim created"
     CLAIM_CONFIRMED = "CLAIM_CONFIRMED", "Claim confirmed on-chain"
     CLAIM_FAILED = "CLAIM_FAILED", "Claim failed"
+    FEE_ACCRUED = "FEE_ACCRUED", "Platform fee accrued to treasury"
     RECONCILIATION = "RECONCILIATION", "Reconciliation note"
 
 

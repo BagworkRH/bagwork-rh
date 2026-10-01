@@ -319,6 +319,7 @@ def mark_claim_confirmed(claim, transaction_hash, *, actor=None) -> Claim:
             reward.save(update_fields=["status"])
             locked.reward = reward
 
+        from apps.blockchain import fees  # noqa: PLC0415 - lazy: avoids an import cycle
         from apps.blockchain.ledger import record  # noqa: PLC0415 - lazy: avoids an import cycle
         from apps.blockchain.models import LedgerAction  # noqa: PLC0415 - lazy import
 
@@ -333,6 +334,19 @@ def mark_claim_confirmed(claim, transaction_hash, *, actor=None) -> Claim:
             amount_smallest_unit=locked.amount_smallest_unit,
             transaction_hash=transaction_hash,
         )
+        # The 15% platform fee is the brand's cost, not a reduction of the
+        # creator's payout, so it is booked as a separate treasury credit. The
+        # creator line above stays at the full signed amount.
+        fee = fees.platform_fee(locked.amount)
+        if fee > 0:
+            record(
+                LedgerAction.FEE_ACCRUED,
+                claim=locked,
+                wallet=locked.wallet,
+                token_symbol=locked.token_symbol,
+                amount=fee,
+                transaction_hash=transaction_hash,
+            )
         AuditLog.objects.create(
             actor=actor,
             action="CLAIM_CONFIRMED",
