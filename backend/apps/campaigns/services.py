@@ -18,6 +18,14 @@ def create_campaign(*, created_by, actor=None, **fields) -> Campaign:
     creators, verify their work, and then fail to pay. That is checked here
     rather than discovered at payout time.
     """
+    # A campaign is funded by the brand that owns it. Derived from the caller
+    # rather than accepted from the request body, so a brand cannot attribute a
+    # campaign to another brand's money. Staff creating a platform-funded
+    # campaign has no brand profile and leaves this null.
+    brand = getattr(created_by, "brand_profile", None)
+    if brand is not None and not fields.get("funding_brand"):
+        fields["funding_brand"] = brand
+
     _validate_campaign_fields(fields, existing=None)
 
     # Normalise the money fields before the insert. The API and admin pass
@@ -90,7 +98,49 @@ def update_campaign(campaign, *, actor=None, **fields) -> Campaign:
     return campaign
 
 
+def _validate_token_allowed(token_symbol: str, chain_id: int) -> None:
+    """The campaign's payout token must be on the chain allowlist.
+
+    A campaign names free text, but the money a creator receives is the token
+    the distributor contract actually holds. If those disagree the campaign
+    promises a payout the contract cannot deliver, and the failure only
+    surfaces at claim time — after the creator has done the work and
+    verification has already approved it.
+
+    `chain_id` is part of the check because a symbol can be allowlisted on one
+    chain and not another, and a cross-chain mismatch produces the same late
+    failure.
+
+    The check is skipped only when there is no allowlist configured for that
+    chain at all, which is the state of a fresh development install. It is NOT
+    skipped merely because the requested symbol is absent: doing that would let
+    any unknown symbol through, defeating the check entirely. Tests and seed
+    data therefore register their token on the allowlist rather than relying on
+    a bypass.
+    """
+    from apps.blockchain.models import TokenConfig  # noqa: PLC0415 - avoids a cycle
+
+    configured = TokenConfig.objects.filter(chain_id=int(chain_id))
+    if not configured.exists():
+        # No allowlist for this chain at all: a fresh install, so there is
+        # nothing to validate against.
+        return
+
+    if not configured.filter(symbol__iexact=token_symbol).exists():
+        allowed = sorted(configured.values_list("symbol", flat=True))
+        raise RewardEngineError(
+            f"{token_symbol} is not an approved payout token on chain {chain_id}. "
+            f"Approved there: {', '.join(allowed)}. Add it to the token allowlist "
+            "before creating a campaign that pays in it."
+        )
+
+
 def _validate_campaign_fields(fields, existing=None):
+    if "token_symbol" in fields or "chain_id" in fields or existing is None:
+        token_symbol = fields.get("token_symbol") or getattr(existing, "token_symbol", None)
+        chain_id = fields.get("chain_id") or getattr(existing, "chain_id", None)
+        if token_symbol and chain_id:
+            _validate_token_allowed(token_symbol, chain_id)
     """Shared validation for create and update."""
 
     def pick(name, default=None):
@@ -220,6 +270,15 @@ def set_campaign_status(campaign, new_status, reason="", *, actor=None) -> Campa
         raise RewardEngineError(
             "status must be one of: " + ", ".join(CampaignStatus.values) + "."
         )
+
+    # A campaign may only go live if the brand behind it has funded the
+    # payouts it promises. Without this the platform would take creators'
+    # work, verify it, approve it, and then be unable to pay — the exact
+    # failure the funding model exists to prevent.
+    if new_status == CampaignStatus.ACTIVE:
+        from .funding import require_campaign_funding  # noqa: PLC0415 - avoids a cycle
+
+        require_campaign_funding(campaign)
 
     with transaction.atomic():
         locked = Campaign.objects.select_for_update().get(pk=campaign.pk)

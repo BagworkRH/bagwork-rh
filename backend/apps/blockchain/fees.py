@@ -19,19 +19,11 @@ from django.conf import settings
 BPS_DENOMINATOR = 10_000
 ONE = Decimal(1)
 
-
-def _to_units(value: Decimal) -> int:
-    """Decimal -> integer smallest units, at the default 18 decimals."""
-    scaled = value.scaleb(default_token_decimals())
-    return int(scaled.to_integral_value(rounding=ROUND_DOWN))
-
-
-def default_token_decimals() -> int:
-    from apps.blockchain.services import (  # noqa: PLC0415 - avoids an import cycle
-        default_token_decimals as _decimals,
-    )
-
-    return _decimals()
+# Fallback only. Real callers pass the token's own decimals; this exists so a
+# bare arithmetic call still works, but relying on it for a real token is a
+# bug: USDC is 6 decimals, not 18, and quoting a fee at the wrong precision
+# makes the backend disagree with the contract.
+DEFAULT_DECIMALS = 18
 
 
 def fee_bps() -> int:
@@ -44,24 +36,41 @@ def fee_rate() -> Decimal:
     return Decimal(fee_bps()) / BPS_DENOMINATOR
 
 
-def platform_fee(payout) -> Decimal:
+def to_units(value, decimals: int | None = None) -> int:
+    """Decimal -> integer smallest units at `decimals` precision."""
+    places = DEFAULT_DECIMALS if decimals is None else decimals
+    scaled = Decimal(value).scaleb(places)
+    return int(scaled.to_integral_value(rounding=ROUND_DOWN))
+
+
+def from_units(units: int, decimals: int | None = None) -> Decimal:
+    """Integer smallest units -> Decimal at `decimals` precision."""
+    places = DEFAULT_DECIMALS if decimals is None else decimals
+    return Decimal(units).scaleb(-places)
+
+
+def platform_fee(payout, decimals: int | None = None) -> Decimal:
     """Fee charged on top of `payout`, in payout units.
 
-    Floored to mirror the contract's integer division (see RewardDistributor.
-    feeFor), so a brand is never quoted a unit more than the chain would
-    accept. Sub-unit fees floor to zero rather than rounding up.
+    `decimals` must be the payout token's precision — pass the campaign's
+    token decimals, never a default. The fee is computed in integer smallest
+    units so it matches `RewardDistributor.feeFor` exactly, including its
+    flooring division: a brand is never quoted a unit more than the contract
+    would charge, and a sub-unit fee floors to zero rather than rounding up
+    into a charge the chain would not make.
     """
     payout = Decimal(payout)
     if payout <= 0:
         return Decimal(0)
-    units = _to_units(payout)
-    fee_units = units * fee_bps() // BPS_DENOMINATOR
-    return Decimal(fee_units).scaleb(-default_token_decimals())
+    places = DEFAULT_DECIMALS if decimals is None else decimals
+    fee_units = to_units(payout, places) * fee_bps() // BPS_DENOMINATOR
+    return from_units(fee_units, places)
 
 
-def total_cost(payout) -> Decimal:
-    """What the brand pays to fund a payout: payout + fee."""
-    return Decimal(payout) + platform_fee(payout)
+def total_cost(payout, decimals: int | None = None) -> Decimal:
+    """What a brand pays to fund a payout: payout + fee."""
+    return Decimal(payout) + platform_fee(payout, decimals)
+
 
 
 def payouts_from_budget(budget, payout) -> int:

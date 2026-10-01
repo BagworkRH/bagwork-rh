@@ -56,6 +56,9 @@ def make_campaign(  # noqa: PLR0913 - test helper with sensible defaults
     status=CampaignStatus.ACTIVE,
     maximum_reward_per_seller=Decimal("0"),
     maximum_rewards_per_seller=0,
+    token_symbol="TST",
+    chain_id=11155111,
+    funding_brand=None,
 ):
     """Create a campaign owned by a staff user."""
     now = timezone.now()
@@ -65,8 +68,8 @@ def make_campaign(  # noqa: PLR0913 - test helper with sensible defaults
         slug=slug,
         description="desc",
         project_name="Project",
-        token_symbol="TST",
-        chain_id=11155111,
+        token_symbol=token_symbol,
+        chain_id=chain_id,
         budget=budget,
         remaining_budget=budget,
         reward_model=reward_model,
@@ -77,6 +80,7 @@ def make_campaign(  # noqa: PLR0913 - test helper with sensible defaults
         end_at=end_at or (now + timedelta(days=30)),
         status=status,
         requirements_json=requirements_json or {},
+        funding_brand=funding_brand,
         created_by=admin,
     )
     return campaign

@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import (
     AllowAny,
-    IsAdminUser,
     IsAuthenticated,
     IsAuthenticatedOrReadOnly,
 )
@@ -52,10 +51,24 @@ def campaign_detail(request, slug):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def campaign_launch(request, slug):
-    """Publish a draft campaign so creators can join it."""
+    """Publish a draft campaign so creators can join it.
+
+    Staff may launch any campaign. A brand may launch only its own, and only
+    once its confirmed USDC covers the budget plus the platform fee — the
+    funding check in `set_campaign_status` is what stops an unfunded campaign
+    from taking creators' work. Restricting this to staff instead would make
+    brands unable to use the platform they are paying for.
+    """
     campaign = get_object_or_404(Campaign, slug=slug)
+    brand = getattr(request.user, "brand_profile", None)
+    owns_campaign = brand is not None and campaign.funding_brand_id == brand.pk
+    if not request.user.is_staff and not owns_campaign:
+        return Response(
+            {"detail": "You can only launch your own campaigns."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     try:
         campaign = set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=request.user)
     except RewardEngineError as exc:
@@ -64,9 +77,14 @@ def campaign_launch(request, slug):
 
 
 def _create_campaign(request):
-    if not request.user.is_staff:
+    # Staff, or a brand creating its own campaign. A brand's campaign is
+    # attributed to that brand by `create_campaign`, so a brand cannot create a
+    # campaign funded by someone else's money.
+    is_brand = hasattr(request.user, "brand_profile")
+    if not request.user.is_staff and not is_brand:
         return Response(
-            {"detail": "Only staff can create campaigns."}, status=status.HTTP_403_FORBIDDEN
+            {"detail": "Only staff or a brand account can create campaigns."},
+            status=status.HTTP_403_FORBIDDEN,
         )
     serializer = CampaignWriteSerializer(data=request.data)
     if not serializer.is_valid():

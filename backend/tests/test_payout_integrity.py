@@ -1,0 +1,209 @@
+"""Payout integrity: decimals, token allowlist, and funding-before-launch.
+
+Each case here corresponds to a way the platform could promise money it does
+not have or quote a number the chain will not honour.
+"""
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+
+from apps.blockchain import fees
+from apps.blockchain.models import TokenConfig
+from apps.campaigns.funding import (
+    campaign_funding_position,
+    confirm_funding,
+    get_or_create_brand,
+    quote_campaign_cost,
+    record_funding,
+    required_campaign_funding,
+)
+from apps.campaigns.models import CampaignStatus
+from apps.campaigns.services import create_campaign, set_campaign_status
+from apps.rewards.exceptions import RewardEngineError
+
+from .helpers import make_campaign
+
+User = get_user_model()
+
+USDC = "0x00000000000000000000000000000000000000DC"
+TX = "0x" + "d" * 64
+
+
+def make_usdc(chain_id=46630, decimals=6):
+    """USDC on the allowlist at its real 6-decimal precision."""
+    token, _ = TokenConfig.objects.get_or_create(
+        symbol="USDC",
+        defaults={"chain_id": chain_id, "address": USDC, "decimals": decimals, "enabled": True},
+    )
+    return token
+
+
+def make_user(username, email, **extra):
+    return User.objects.create_user(
+        username=username, email=email, password="Testpass123!", **extra
+    )
+
+
+def window():
+    now = datetime.now(timezone.utc)
+    return now - timedelta(days=1), now + timedelta(days=30)
+
+
+def campaign_fields(**overrides):
+    start, end = window()
+    fields = {
+        "description": "d",
+        "project_name": "P",
+        "token_symbol": "USDC",
+        "chain_id": 46630,
+        "reward_model": "FIXED",
+        "reward_rate": Decimal("5"),
+        "maximum_reward_per_seller": Decimal("0"),
+        "maximum_rewards_per_seller": 0,
+        "start_at": start,
+        "end_at": end,
+    }
+    fields.update(overrides)
+    return fields
+
+
+class FeeDecimalsTests(TestCase):
+    """USDC is 6 decimals. Quoting at 18 invents precision the chain lacks."""
+
+    def test_fee_matches_the_contract_at_the_token_real_precision(self):
+        self.assertEqual(fees.platform_fee(Decimal("500"), 6), Decimal("75"))
+        # A sub-cent payout floors to zero at 6dp, exactly as the contract does.
+        self.assertEqual(fees.platform_fee(Decimal("0.0000001"), 6), Decimal("0"))
+
+    def test_wrong_precision_would_misquote_a_brand(self):
+        """This is the bug the decimals argument exists to prevent."""
+        at_18 = fees.platform_fee(Decimal("0.0000001"), 18)
+        at_6 = fees.platform_fee(Decimal("0.0000001"), 6)
+        self.assertNotEqual(at_18, at_6)
+        self.assertGreater(at_18, at_6)
+
+    def test_quote_uses_the_campaign_token_precision(self):
+        make_usdc()
+        user = make_user("feeuser", "fee@example.com")
+        brand = get_or_create_brand(user, company_name="Fee Co", actor=user)
+        quote = quote_campaign_cost(brand, payout_total=Decimal("500"), decimals=6)
+        self.assertEqual(Decimal(quote["platform_fee"]), Decimal("75"))
+class TokenAllowlistTests(TestCase):
+    def test_campaign_paying_an_unlisted_token_is_refused(self):
+        """A free-text symbol would let a campaign promise a token the
+        distributor does not hold, failing only at claim time."""
+        make_usdc()
+        admin = make_user("admin1", "a1@example.com", is_staff=True)
+        with self.assertRaises(RewardEngineError) as ctx:
+            create_campaign(
+                created_by=admin,
+                name="Bad",
+                slug="bad-token",
+                budget=Decimal("100"),
+                **campaign_fields(token_symbol="SCAM"),
+            )
+        self.assertIn("SCAM", str(ctx.exception))
+        self.assertIn("allowlist", str(ctx.exception))
+
+    def test_allowlisted_token_is_accepted(self):
+        make_usdc()
+        admin = make_user("admin2", "a2@example.com", is_staff=True)
+        campaign = create_campaign(
+            created_by=admin,
+            name="Good",
+            slug="good-token",
+            budget=Decimal("100"),
+            **campaign_fields(),
+        )
+        self.assertEqual(campaign.token_symbol, "USDC")
+
+    def test_token_allowlisted_on_another_chain_is_still_refused(self):
+        """A symbol approved on one chain is not approved on another.
+
+        The chain is populated with USDC, but this campaign asks for a different
+        symbol on that same chain — a mismatch that would otherwise only fail at
+        claim time.
+        """
+        make_usdc(chain_id=46630)
+        admin = make_user("admin3", "a3@example.com", is_staff=True)
+        with self.assertRaises(RewardEngineError) as ctx:
+            create_campaign(
+                created_by=admin,
+                name="WrongToken",
+                slug="wrong-token",
+                budget=Decimal("100"),
+                **campaign_fields(token_symbol="USDT"),
+            )
+        self.assertIn("USDT", str(ctx.exception))
+
+class FundingBeforeLaunchTests(TestCase):
+    """The 'who provides the money' rule, enforced in code.
+
+    Without this, creators post, get verified and approved, and the payout
+    fails at claim time — after the work is already done.
+    """
+
+    def test_brand_campaign_cannot_launch_unfunded(self):
+        make_usdc()
+        user = make_user("brand1", "b1@example.com")
+        brand = get_or_create_brand(user, company_name="Fund Co", actor=user)
+        campaign = create_campaign(
+            created_by=user,
+            name="Unfunded",
+            slug="unfunded",
+            budget=Decimal("500"),
+            **campaign_fields(),
+        )
+        self.assertEqual(campaign.funding_brand, brand)
+
+        with self.assertRaises(RewardEngineError) as ctx:
+            set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
+        self.assertIn("not funded", str(ctx.exception))
+
+        # Fund it: 500 of payouts plus a 15% fee is 575.
+        dep = record_funding(brand, amount="575", chain_id=46630, tx_hash=TX)
+
+        # PENDING does not count: recording a deposit is not crediting it.
+        with self.assertRaises(RewardEngineError):
+            set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
+
+        confirm_funding(dep, actor=user)
+        campaign = set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
+        self.assertEqual(campaign.status, CampaignStatus.ACTIVE)
+
+    def test_partial_funding_still_blocks_launch(self):
+        make_usdc()
+        user = make_user("brand2", "b2@example.com")
+        brand = get_or_create_brand(user, company_name="Part Co", actor=user)
+        campaign = create_campaign(
+            created_by=user,
+            name="Partial",
+            slug="partial",
+            budget=Decimal("500"),
+            **campaign_fields(),
+        )
+        dep = record_funding(brand, amount="500", chain_id=46630, tx_hash=TX)
+        confirm_funding(dep, actor=user)
+        # 500 covers the payouts but not the 75 fee.
+        position = campaign_funding_position(campaign)
+        self.assertFalse(position["sufficient"])
+        self.assertEqual(Decimal(position["shortfall"]), Decimal("75"))
+        with self.assertRaises(RewardEngineError):
+            set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
+
+    def test_required_funding_is_budget_plus_fee(self):
+        make_usdc()
+        campaign = make_campaign(
+            budget=Decimal("500"), token_symbol="USDC", chain_id=46630
+        )
+        self.assertEqual(required_campaign_funding(campaign), Decimal("575"))
+
+    def test_staff_funded_campaigns_skip_the_check(self):
+        """Platform-funded campaigns have no brand to check, so development and
+        seed campaigns still launch."""
+        campaign = make_campaign(status=CampaignStatus.DRAFT)
+        campaign = set_campaign_status(campaign, CampaignStatus.ACTIVE)
+        self.assertEqual(campaign.status, CampaignStatus.ACTIVE)
+

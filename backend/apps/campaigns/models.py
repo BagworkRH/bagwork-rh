@@ -53,6 +53,17 @@ class Campaign(models.Model):
     # in-flight one only reads what is new. Polling with no watermark would
     # re-scan history every tick and burn credits for nothing.
     discovery_watermarks = models.JSONField(default=dict, blank=True)
+    # Which brand funds this campaign. Null means staff-funded (platform-funded
+    # campaigns during development), which skips the funding check at launch.
+    # Set on creation from the brand's own account so a campaign cannot be
+    # attributed to another brand's money.
+    funding_brand = models.ForeignKey(
+        "campaigns.BrandProfile",
+        on_delete=models.PROTECT,
+        related_name="campaigns",
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.PROTECT, related_name="campaigns"
     )
@@ -150,7 +161,10 @@ class BrandFunding(models.Model):
     """
 
     brand = models.ForeignKey(BrandProfile, on_delete=models.PROTECT, related_name="fundings")
-    amount = models.DecimalField(max_digits=40, decimal_places=6)
+    # 18 decimal places, matching the widest precision the allowlist permits
+    # (USDC is 6, the platform default is 18). A narrower column would round a
+    # deposit off-cent and make it fail to match the payouts it was sent to fund.
+    amount = models.DecimalField(max_digits=40, decimal_places=18)
     chain_id = models.PositiveIntegerField()
     token_symbol = models.CharField(max_length=16, default="USDC")
     tx_hash = models.CharField(max_length=66)

@@ -182,16 +182,80 @@ def confirmed_funded_balance(brand, *, campaign=None) -> Decimal:
     )
 
 
-def quote_campaign_cost(brand, *, payout_total) -> dict:
+def required_campaign_funding(campaign) -> Decimal:
+    """USDC a campaign needs on deposit before it may go live.
+
+    Budget is the sum of creator payouts the campaign promises, so the deposit
+    required is that budget plus the platform fee. A campaign that is not
+    funded cannot be launched: it would accept creators, verify their work, and
+    then be unable to pay, which is the failure mode the funding model exists
+    to prevent.
+    """
+    decimals = campaign_token_decimals(campaign)
+    return fees.total_cost(campaign.budget, decimals)
+
+
+def campaign_funding_position(campaign) -> dict:
+    """How a campaign is funded versus what it needs."""
+    brand = campaign.funding_brand
+    required = required_campaign_funding(campaign)
+    funded = confirmed_funded_balance(brand) if brand is not None else Decimal(0)
+    return {
+        "required": str(required),
+        "funded": str(funded),
+        "shortfall": str(max(Decimal(0), required - funded)),
+        "sufficient": funded >= required,
+    }
+
+
+def campaign_token_decimals(campaign) -> int:
+    """Precision of the token this campaign pays in.
+
+    Read from the allowlist so fee arithmetic matches the chain. Falls back to
+    the platform default only when the token is not registered.
+    """
+    from apps.blockchain.models import TokenConfig  # noqa: PLC0415 - avoids a cycle
+
+    token = TokenConfig.objects.filter(
+        symbol__iexact=campaign.token_symbol, chain_id=campaign.chain_id
+    ).first()
+    return token.decimals if token else fees.DEFAULT_DECIMALS
+
+
+def require_campaign_funding(campaign) -> None:
+    """Raise unless the campaign's brand has funded its budget plus the fee.
+
+    Called when a campaign goes live. This is the "who provides the money"
+    question answered in code rather than in a policy document: a campaign
+    cannot accept creators until the brand's confirmed USDC covers the payouts
+    it promises.
+    """
+    if campaign.funding_brand is None:
+        return  # staff-funded campaign, no brand account to check
+
+    position = campaign_funding_position(campaign)
+    if not position["sufficient"]:
+        raise RewardEngineError(
+            f"Campaign '{campaign.slug}' is not funded. It needs {position['required']} "
+            f"{campaign.token_symbol} (budget plus the platform fee) but only "
+            f"{position['funded']} is confirmed. Fund the brand, then launch."
+        )
+
+
+def quote_campaign_cost(brand, *, payout_total, decimals=None) -> dict:
     """What a brand must deposit to fund a campaign of this size.
 
     `payout_total` is the sum of creator payouts the campaign promises (for a
     fixed-rate campaign, reward_rate x expected posts). The 15% fee is added
     on top, exactly as `requiredDeposit` does on chain. A brand is therefore
     never quoted a total the contract would reject as under-funded.
+
+    `decimals` must be the payout token's precision — for USDC that is 6, not
+    the 18 default. Quoting at the wrong precision produces a fee the chain
+    would never charge.
     """
     payout_total = Decimal(str(payout_total))
-    fee = fees.platform_fee(payout_total)
+    fee = fees.platform_fee(payout_total, decimals)
     total = payout_total + fee
     funded = confirmed_funded_balance(brand)
     return {

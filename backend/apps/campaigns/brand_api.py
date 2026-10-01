@@ -41,6 +41,20 @@ def _error(exc):
     return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _usdc_decimals() -> int:
+    """Precision of the allowlisted USDC token, for fee arithmetic.
+
+    Read from the allowlist rather than assumed: USDC is 6 decimals, while the
+    platform default is 18, and quoting a brand's fee at 18 would produce a
+    number the chain would never charge. Falls back to the allowlist default
+    only when USDC is not yet registered.
+    """
+    from apps.blockchain.models import TokenConfig  # noqa: PLC0415 - lazy: avoids a cycle
+
+    token = TokenConfig.objects.filter(symbol__iexact="USDC").first()
+    return token.decimals if token else 6
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def brand_profile(request):
@@ -160,7 +174,10 @@ def brand_quote(request):
             {"payout_total": ["Must be greater than zero."]},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    return Response(quote_campaign_cost(brand, payout_total=payout_total))
+    decimals = _usdc_decimals()
+    quote = quote_campaign_cost(brand, payout_total=payout_total, decimals=decimals)
+    quote["token_decimals"] = decimals
+    return Response(quote)
 
 
 @api_view(["GET"])

@@ -155,6 +155,45 @@ actual guard.
 
 The same hash on a *different* chain is a different transfer and is allowed.
 
+### Payout integrity
+
+Three rules keep the platform from promising money it does not have. Each was
+a real defect found while wiring the USDC rail up.
+
+**Decimals come from the token, never a default.** `fees.platform_fee` and
+`quote_campaign_cost` take an explicit `decimals` argument. USDC is **6**
+decimals while the platform default is 18, and quoting a fee at 18 invents
+precision the chain does not have — a sub-cent payout would be quoted a
+1.5e-8 fee the contract would never charge. `mark_claim_confirmed` and the
+quote endpoint both read the precision from the `TokenConfig` allowlist.
+
+**A campaign's payout token must be allowlisted for its chain.** A campaign
+names free text, but the money a creator receives is whatever the distributor
+holds. If those disagree the campaign promises a payout the contract cannot
+deliver, and it only fails at claim time — after the work is done. The check
+is skipped only when no allowlist exists for that chain at all (a fresh
+install); it is never skipped merely because the symbol is absent, which would
+defeat it entirely.
+
+**A campaign cannot launch unfunded.** `set_campaign_status(ACTIVE)` calls
+`require_campaign_funding`, which requires the brand's *confirmed* USDC to
+cover `budget × 1.15`. A PENDING deposit does not count: recording a deposit
+is not crediting it. Without this, creators post, verification approves the
+work, and the payout then fails — the exact failure the funding model exists
+to prevent.
+
+Staff-funded campaigns (`funding_brand` null) skip the check so seed and
+development campaigns still launch. Brands may create and launch their own
+campaigns; the funding gate, not a staff-only permission, is what stops an
+unfunded one going live.
+
+```bash
+python manage.py shell -c "
+from apps.blockchain.models import TokenConfig
+TokenConfig.objects.update_or_create(symbol='USDC', chain_id=46630, defaults={
+    'address': '0x...', 'decimals': 6, 'enabled': True})"
+```
+
 ## Treasury
 Admin treasury separated from app wallets. Multisig for meaningful balances.
 No keys in source code; secure signing system in production. Don't hold user

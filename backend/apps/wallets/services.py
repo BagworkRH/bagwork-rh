@@ -336,8 +336,13 @@ def mark_claim_confirmed(claim, transaction_hash, *, actor=None) -> Claim:
         )
         # The 15% platform fee is the brand's cost, not a reduction of the
         # creator's payout, so it is booked as a separate treasury credit. The
-        # creator line above stays at the full signed amount.
-        fee = fees.platform_fee(locked.amount)
+        # creator line above stays at the full signed amount. The fee is
+        # computed at the payout token's own precision, mirroring the contract.
+        from apps.blockchain.models import TokenConfig  # noqa: PLC0415 - lazy import
+
+        token = TokenConfig.objects.filter(symbol__iexact=locked.token_symbol).first()
+        decimals = token.decimals if token else fees.DEFAULT_DECIMALS
+        fee = fees.platform_fee(locked.amount, decimals)
         if fee > 0:
             record(
                 LedgerAction.FEE_ACCRUED,
