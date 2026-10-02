@@ -15,6 +15,7 @@ from datetime import timedelta
 from celery import shared_task
 from django.utils import timezone
 
+from apps.rewards.exceptions import RewardEngineError
 from apps.wallets.models import Claim, ClaimStatus
 from apps.wallets.services import mark_claim_expired
 
@@ -69,3 +70,35 @@ def reconcile_blockchain_ledger():
 def monitor_anomalous_claims(threshold: int = 20):
     """Flag unusually high claim volume for the fraud/risk review queue."""
     return monitor_claim_volume(threshold)
+
+
+@shared_task
+def confirm_pending_fundings(limit: int = 50):
+    """Retry verification for deposits still waiting on the chain.
+
+    A brand's transfer is often mined before it is deep enough to credit, and
+    an RPC outage can leave a verified deposit pending for a while. Both are
+    resolved by asking the chain again, so this task exists to do that without
+    an operator or the brand having to poll.
+
+    Failures are counted, not raised per-deposit: one unverified hash must not
+    abort the batch, and every failure leaves its deposit PENDING, which is the
+    safe direction.
+    """
+    from apps.campaigns.funding import confirm_funding  # noqa: PLC0415 - avoids an import cycle
+    from apps.campaigns.models import BrandFunding, FundingStatus  # noqa: PLC0415
+
+    pending = BrandFunding.objects.filter(status=FundingStatus.PENDING).order_by("funded_at")[:limit]
+    confirmed = 0
+    still_pending = 0
+    for funding in list(pending):
+        try:
+            confirm_funding(funding)
+            confirmed += 1
+        except RewardEngineError:
+            # Expected while a transfer is unmined, shallow, or the RPC is down.
+            still_pending += 1
+        except Exception:  # pragma: no cover - unexpected, must not kill the batch
+            logger.exception("Unexpected failure verifying funding %s", funding.pk)
+            still_pending += 1
+    return {"confirmed": confirmed, "still_pending": still_pending}

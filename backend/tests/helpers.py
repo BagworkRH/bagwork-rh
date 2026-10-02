@@ -1,11 +1,18 @@
 """Shared test helpers for the platform test suite."""
+from contextlib import contextmanager
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.utils import timezone
 from eth_account import Account
+from hexbytes import HexBytes
+from web3 import Web3
+from web3.datastructures import AttributeDict
+from web3.types import HexStr
 
 from apps.blockchain import signing
 from apps.blockchain.models import TokenConfig
@@ -20,6 +27,9 @@ from apps.social.models import (
 from apps.wallets.models import Wallet
 
 User = get_user_model()
+
+TREASURY = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"
+TRANSFER_TOPIC_FULL = Web3.keccak(text="Transfer(address,address,uint256)").hex()
 
 
 def make_user(email="seller@example.com", username="seller", password="Testpass123!"):
@@ -268,3 +278,112 @@ def make_verified_post(  # noqa: PLR0913 - test helper with sensible defaults
         originality_evidence=originality_evidence,
     )
     return post
+
+
+def transfer_log(token_address, sender, recipient, amount_units):
+    """One real ERC-20 Transfer log, encoded the way a node returns it.
+
+    Built by encoding through Web3 rather than by pasting hex, so a test
+    fixture cannot drift from the event the verifier actually parses.
+    """
+    sender_topic = HexBytes(HexStr("0x" + "0" * 24 + sender[2:].lower()))
+    recipient_topic = HexBytes(HexStr("0x" + "0" * 24 + recipient[2:].lower()))
+    return {
+        "address": Web3.to_checksum_address(token_address),
+        "topics": (HexBytes(HexStr(TRANSFER_TOPIC_FULL)), sender_topic, recipient_topic),
+        "data": HexBytes(amount_units),
+    }
+
+
+def fake_web3(
+    *,
+    chain_id=46630,
+    head=100,
+    receipt=None,
+    receipt_error=None,
+):
+    """A stand-in node that returns a caller-controlled receipt.
+
+    This fakes the *transport*, not the verification. `verify_deposit` still
+    parses the log, matches the token contract, compares the recipient, reads
+    decimals and counts confirmations, so a test that passes here proves the
+    real code accepts a real-looking transfer — and a test that expects a
+    rejection proves the real code refuses it.
+    """
+    eth = SimpleNamespace(
+        chain_id=chain_id,
+        block_number=head,
+        get_transaction_receipt=(
+            (lambda _h: (_ for _ in ()).throw(receipt_error)) if receipt_error else (lambda _h: receipt)
+        ),
+    )
+    return SimpleNamespace(eth=eth)
+
+
+def fake_receipt(*, block_number=90, status=1, logs=()):
+    """A receipt shaped like the one web3 actually returns.
+
+    `AttributeDict` rather than a bare namespace because a real receipt is one:
+    the verifier reads `receipt.get("logs", [])` and `receipt.blockNumber`, and
+    a fake supporting only the second would let a mismatch between the fixture
+    and the live interface pass unnoticed.
+    """
+    return AttributeDict({"status": status, "blockNumber": block_number, "logs": list(logs)})
+
+
+def funding_settings(confirmations=3, treasury=TREASURY):
+    """Settings with a treasury and an RPC, so funding can be verified at all.
+
+    `FUNDING_TREASURY_ADDRESS` is deliberately a real-looking address rather
+    than a placeholder: the verifier checksums it and compares it against the
+    transfer recipient, and "0x000...0" would make several rejection paths
+    unreachable in tests.
+    """
+    return override_settings(
+        FUNDING_TREASURY_ADDRESS=treasury,
+        FUNDING_CONFIRMATIONS=confirmations,
+        RPC_URL="http://127.0.0.1:8545",
+        CONTRACT_ADDRESS="0x00000000000000000000000000000000000000CC",
+        CHAIN_ID=46630,
+    )
+
+
+@contextmanager
+def chain_showing(  # noqa: PLR0913 - one keyword per way a deposit can fail
+    *,
+    amount_units=100 * 10**18,
+    token_address,
+    recipient=TREASURY,
+    sender="0x1234567890123456789012345678901234567890",
+    chain_id=46630,
+    head=100,
+    block_number=90,
+    status=1,
+    logs=None,
+    no_receipt=False,
+    confirmations=3,
+    treasury=TREASURY,
+    node=True,
+):
+    """Present a specific chain to the deposit verifier.
+
+    The *node* is faked; the *verification* is not. `verify_deposit` still
+    parses the log, matches the emitting contract, compares the recipient, reads
+    decimals from the allowlist and counts confirmations against the head. So a
+    test that credits money here is evidence the real code accepts a real
+    transfer, and a test that expects a refusal is evidence it catches the
+    attempt.
+
+    Each keyword is one way a deposit can fail to verify, which is why there are
+    so many of them: they are the cases, not configuration.
+    """
+    if logs is None and not no_receipt:
+        logs = [transfer_log(token_address, sender, recipient, amount_units)]
+    receipt = None
+    if not no_receipt:
+        receipt = fake_receipt(block_number=block_number, status=status, logs=logs or [])
+    w3 = fake_web3(chain_id=chain_id, head=head, receipt=receipt)
+    target = w3 if node else None
+    with funding_settings(confirmations=confirmations, treasury=treasury):
+        with mock.patch("apps.blockchain.deposits.get_web3", return_value=target):
+            yield

@@ -204,6 +204,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.blockchain.tasks.expire_stale_claims",
         "schedule": timedelta(minutes=15),
     },
+    # Re-verify brand deposits that are still waiting. A transfer usually needs
+    # a few blocks before it is final, and an RPC blip can strand a deposit that
+    # was actually paid for, so the retry lives here rather than depending on a
+    # brand noticing and asking again.
+    "confirm-pending-fundings": {
+        "task": "apps.blockchain.tasks.confirm_pending_fundings",
+        "schedule": timedelta(minutes=2),
+    },
     "monitor-anomalous-claims": {
         "task": "apps.blockchain.tasks.monitor_anomalous_claims",
         "schedule": timedelta(hours=1),
@@ -277,6 +285,17 @@ DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
 # Must be allowlisted for the campaign's chain, or campaigns paying in it are
 # refused at creation (see campaigns.services._validate_token_allowed).
 FUNDING_TOKEN_SYMBOL = os.environ.get("FUNDING_TOKEN_SYMBOL", "USDG")
+# The address brands must actually send funding to. A deposit is only credited
+# when the receipt shows the allowlisted token transferring to THIS address, so
+# it is a hard gate rather than a display value: left empty, no deposit can be
+# confirmed at all. That is intentional. Before this check existed, a brand
+# could point at a real transfer of its own stablecoin to a wallet it controls
+# and have the platform credit it as funding.
+FUNDING_TREASURY_ADDRESS = os.environ.get("FUNDING_TREASURY_ADDRESS", "")
+# Confirmations a deposit needs before it counts as final. A transaction with
+# zero confirmations can still be reorged out, so crediting immediately credits
+# a promise. 3 is the usual floor for "this is not going away".
+FUNDING_CONFIRMATIONS = int(os.environ.get("FUNDING_CONFIRMATIONS", "3"))
 # Platform fee in basis points, charged on top of the creator payout and never
 # deducted from it (must match RewardDistributor.PLATFORM_FEE_BPS = 1500).
 # 1500 = 15%: a $5 payout costs a brand $5.75, the creator still receives $5.

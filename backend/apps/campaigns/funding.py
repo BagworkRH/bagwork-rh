@@ -26,6 +26,7 @@ from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.blockchain import fees
+from apps.blockchain.deposits import verify_deposit
 from apps.rewards.exceptions import RewardEngineError
 
 from .models import BrandFunding, BrandProfile, BrandStatus, FundingStatus
@@ -141,23 +142,74 @@ def record_funding(  # noqa: PLR0913 - an explicit funding record
 
 
 def confirm_funding(funding, *, actor=None) -> BrandFunding:
-    """Mark a deposit CONFIRMED once the on-chain transfer is verified."""
+    """Confirm a deposit, but only if the chain says the money arrived.
+
+    The previous version of this function set the status directly. It read like
+    a verification because of its docstring and its placement next to the
+    on-chain allowlist, but nothing was checked: a brand could POST its own
+    deposit id and mint itself an unlimited confirmed balance, then launch any
+    campaign through the funding gate with money it never sent. The gate was
+    keyed on a token the brand issued.
+
+    Now the receipt is the only thing that can move a deposit out of PENDING.
+    There is deliberately no `force` flag and no unverified path: every early
+    exit either returns an already-confirmed deposit unchanged or raises.
+
+    Recording what was verified (block, confirmations, sender, amount) is part
+    of the confirmation, not a nicety — a funding dispute is settled by
+    pointing at a block, not by asserting that a check happened.
+    """
     if funding.status == FundingStatus.CONFIRMED:
         return funding
     if funding.status == FundingStatus.REJECTED:
         raise RewardEngineError("A rejected deposit cannot be confirmed.")
 
-    funding.status = FundingStatus.CONFIRMED
-    funding.confirmed_at = timezone.now()
-    funding.save(update_fields=["status", "confirmed_at"])
-
-    AuditLog.objects.create(
-        actor=actor,
-        action="BRAND_FUNDING_CONFIRMED",
-        object_type="BrandFunding",
-        object_id=str(funding.pk),
-        metadata={"amount": str(funding.amount), "tx_hash": funding.tx_hash},
+    verified = verify_deposit(
+        chain_id=funding.chain_id,
+        tx_hash=funding.tx_hash,
+        token_symbol=funding.token_symbol,
+        expected_amount=funding.amount,
     )
+
+    with transaction.atomic():
+        # Re-read under a lock so two concurrent confirmations of the same
+        # deposit cannot both write an audit row or double-stamp confirmed_at.
+        locked = BrandFunding.objects.select_for_update().get(pk=funding.pk)
+        if locked.status == FundingStatus.CONFIRMED:
+            return locked
+        if locked.status == FundingStatus.REJECTED:
+            raise RewardEngineError("A rejected deposit cannot be confirmed.")
+
+        locked.status = FundingStatus.CONFIRMED
+        locked.confirmed_at = timezone.now()
+        locked.verified_block = verified.block_number
+        locked.verified_confirmations = verified.confirmations
+        locked.verified_sender = verified.from_address
+        locked.verified_amount = verified.amount
+        locked.save(
+            update_fields=[
+                "status",
+                "confirmed_at",
+                "verified_block",
+                "verified_confirmations",
+                "verified_sender",
+                "verified_amount",
+            ]
+        )
+
+        AuditLog.objects.create(
+            actor=actor,
+            action="BRAND_FUNDING_CONFIRMED",
+            object_type="BrandFunding",
+            object_id=str(locked.pk),
+            metadata={
+                "amount": str(locked.amount),
+                "tx_hash": locked.tx_hash,
+                "chain_id": locked.chain_id,
+                "onchain": verified.as_metadata(),
+            },
+        )
+        funding = locked
     return funding
 
 

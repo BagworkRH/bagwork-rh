@@ -141,6 +141,54 @@ Every endpoint is scoped to the signed-in user's own brand. Confirmation
 re-checks ownership on the object rather than trusting the URL, so a brand
 cannot credit another brand's deposit by guessing an id.
 
+### What "confirmed" actually means
+
+`POST /api/v1/brand/funding/<id>/confirm/` lets a brand *ask* whether their
+money has landed. It does not let them assert that it has. The brand is the
+party with an interest in the answer, so the answer is read from a receipt by
+`apps/blockchain/deposits.verify_deposit`, which checks all of:
+
+| Check | Refuses when |
+| --- | --- |
+| RPC reachable | The node cannot be reached — a deposit is never credited because the platform *couldn't* check it |
+| Chain id | The node is not on the chain the deposit claims |
+| Token allowlisted | The symbol is unknown or disabled for that chain, so its decimals cannot be trusted |
+| Receipt exists | No receipt: unmined, or the hash is wrong |
+| Status 0 | The transaction reverted and moved nothing |
+| Confirmation depth | Fewer than `FUNDING_CONFIRMATIONS` (default 3) — a shallow transfer can still be reorged out |
+| Emitting contract | The `Transfer` log did not come from the allowlisted token's own address |
+| Recipient | The transfer did not go to `FUNDING_TREASURY_ADDRESS` |
+| Amount | Less arrived than the deposit claims |
+
+Every one of these leaves the deposit `PENDING` and credits nothing. There is
+no `force` parameter and no unverified path.
+
+The recipient check is what stops the obvious exploit: without it, a brand
+could make a real, correctly-valued transfer of its own stablecoin to a wallet
+it controls, submit that hash, and have the platform call it funding. The
+treasury address comes from settings and is never caller-supplied — a check
+that accepts a caller-chosen recipient is not a check.
+
+Two of these settings are required before any deposit can be confirmed at all:
+
+```bash
+FUNDING_TREASURY_ADDRESS=0x...   # the address brands must send to
+FUNDING_CONFIRMATIONS=3          # depth before a transfer counts as final
+```
+
+Leaving `FUNDING_TREASURY_ADDRESS` empty does not disable verification, it
+disables crediting. That is deliberate: an unset treasury must not become a way
+to confirm deposits against an address nobody checked.
+
+Confirmation also records what it verified — block, confirmation count, sender,
+and the amount actually received — on the deposit and in the audit log. A
+funding dispute is settled by pointing at a block, not by asserting that a
+check happened.
+
+`confirm_pending_fundings` runs on a 2-minute beat and re-checks deposits still
+pending, so a transfer that was mined but not yet deep enough is credited
+without the brand having to poll.
+
 ### Two rules that protect real money
 
 **Recording is not crediting.** A deposit is stored `PENDING` and does not

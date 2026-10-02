@@ -187,6 +187,18 @@ class BrandFunding(models.Model):
     )
     funded_at = models.DateTimeField(default=timezone.now)
     confirmed_at = models.DateTimeField(null=True, blank=True)
+    # What the chain actually said at confirmation time. A funding dispute is
+    # settled by pointing at a block and a sender address, so the evidence is
+    # stored rather than discarded once the check has passed. Null until a
+    # confirmation has verified it: a non-null row with no evidence here would
+    # mean a confirmation happened without a receipt, which is the bug these
+    # fields were added to make impossible to hide.
+    verified_block = models.BigIntegerField(null=True, blank=True)
+    verified_confirmations = models.PositiveIntegerField(null=True, blank=True)
+    verified_sender = models.CharField(max_length=42, null=True, blank=True)
+    verified_amount = models.DecimalField(
+        max_digits=40, decimal_places=18, null=True, blank=True
+    )
 
     class Meta:
         ordering = ["-funded_at"]

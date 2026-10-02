@@ -23,7 +23,7 @@ from apps.campaigns.models import CampaignStatus
 from apps.campaigns.services import create_campaign, set_campaign_status
 from apps.rewards.exceptions import RewardEngineError
 
-from .helpers import make_campaign
+from .helpers import chain_showing, make_campaign
 
 User = get_user_model()
 
@@ -175,7 +175,11 @@ class FundingBeforeLaunchTests(TestCase):
         with self.assertRaises(RewardEngineError):
             set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
 
-        confirm_funding(dep, actor=user)
+        # Now let the chain vouch for it, and the gate opens.
+        with chain_showing(
+            token_address=USDG_ADDRESS, chain_id=46630, amount_units=575 * 10**6
+        ):
+            confirm_funding(dep, actor=user)
         campaign = set_campaign_status(campaign, CampaignStatus.ACTIVE, actor=user)
         self.assertEqual(campaign.status, CampaignStatus.ACTIVE)
 
@@ -191,7 +195,12 @@ class FundingBeforeLaunchTests(TestCase):
             **campaign_fields(),
         )
         dep = record_funding(brand, amount="500", chain_id=46630, tx_hash=TX)
-        confirm_funding(dep, actor=user)
+        # Fully verified on chain — 500 really did arrive. It is still not enough,
+        # because the gate asks for the fee as well as the payouts.
+        with chain_showing(
+            token_address=USDG_ADDRESS, chain_id=46630, amount_units=500 * 10**6
+        ):
+            confirm_funding(dep, actor=user)
         # 500 covers the payouts but not the 75 fee.
         position = campaign_funding_position(campaign)
         self.assertFalse(position["sufficient"])
