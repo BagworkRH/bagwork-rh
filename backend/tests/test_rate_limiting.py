@@ -34,12 +34,16 @@ TOO_MANY = status.HTTP_429_TOO_MANY_REQUESTS
 
 # Tiny budgets for the path-scoped throttles; the anon/user baselines stay
 # generous so they never interfere with the scoped assertions.
+# Every scope must be present: `PathScopedThrottle.get_rate` raises
+# ImproperlyConfigured for a scope with no rate, and these throttles are already
+# captured on `APIView` at import time, so a missing key breaks every request.
 TINY_SCOPES = {
     "anon": "1000/hour",
     "user": "1000/hour",
     "auth": "3/hour",
     "admin": "3/hour",
     "wallet": "3/hour",
+    "submit": "3/hour",
 }
 # ...and the inverse: a tiny anonymous baseline with the scopes out of the way.
 TINY_ANON = {**TINY_SCOPES, "anon": "2/hour"}

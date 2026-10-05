@@ -47,7 +47,16 @@ def _originality_is_payable(campaign, post) -> bool:
 CALCULATION_VERSION = RewardCalculationVersion.V1
 ZERO = Decimal("0")
 TOKEN_PRECISION = Decimal("0.000000000000000001")  # 18 decimals
-_COUNTED_STATUSES = (
+# Statuses that count against a seller's caps: everything except a failed or
+# reversed reward.
+#
+# PENDING is included, and that is the important part. `calculate_reward`
+# debits the campaign budget the moment a reward row is created, so a PENDING
+# reward is money already promised. A count that ignored it would let a farm
+# create an unlimited number of unverified rewards — every one of them sitting
+# at PENDING, none of them counted — before any reviewer ever saw the queue.
+_EARNING_STATUSES = (
+    RewardStatus.PENDING,
     RewardStatus.VERIFIED,
     RewardStatus.APPROVED,
     RewardStatus.AVAILABLE,
@@ -146,10 +155,16 @@ def compute_raw_reward(campaign, post, snapshot=None) -> RewardResult:
 def apply_caps(campaign, seller, post, snapshot=None) -> RewardResult:
     """Apply caps to the raw calculation.
 
-    Enforces:
-      - per-post cap  (requirements_json["maximum_reward_per_post"])
-      - per-seller cap (campaign.maximum_reward_per_seller)
+    Enforces, in order of how much they should matter:
+      - per-post count cap  (requirements_json["maximum_rewards_per_post"])
+      - per-seller count cap (campaign.maximum_rewards_per_seller)
+      - per-seller value cap (campaign.maximum_reward_per_seller)
     (the remaining-budget cap is applied by `calculate_reward` under lock).
+
+    The count caps are the ones a farm actually hits: a creator submitting the
+    same post repeatedly, or several posts, is limited by *how many* they can
+    earn, not by the value of each. Value-only caps do not bound a fixed-reward
+    campaign at all, since 5 x 5 = 5 forever if there is no count.
     """
     result = compute_raw_reward(campaign, post, snapshot)
     amount = result.gross
@@ -158,13 +173,33 @@ def apply_caps(campaign, seller, post, snapshot=None) -> RewardResult:
     if per_post_cap > 0 and amount > per_post_cap:
         amount = per_post_cap
 
+    # Count of rewards already earned by this seller on this campaign. Computed
+    # once and reused by both count- and value-cap logic so the two can never
+    # disagree about what "already earned" means.
+    earned = ZERO
+    earned_count = 0
+    prior = Reward.objects.filter(
+        seller=seller,
+        campaign=campaign,
+        status__in=_EARNING_STATUSES,
+    )
+    aggregate = prior.aggregate(total=models.Sum("amount"), n=models.Count("id"))
+    earned = aggregate["total"] or ZERO
+    earned_count = aggregate["n"] or 0
+
+    max_rewards = campaign.maximum_rewards_per_seller or 0
+    if max_rewards and earned_count >= max_rewards:
+        # Hard stop, not a trim: the brand set a hard limit on how many
+        # rewards this creator may receive, and paying a partial one anyway
+        # would quietly exceed the promise made at campaign creation.
+        raise RewardEngineError(
+            f"Seller {seller.seller_code} has reached the campaign limit of "
+            f"{max_rewards} reward(s) (already earned {earned_count}). No further "
+            "rewards can be calculated for this campaign."
+        )
+
     per_seller_cap = campaign.maximum_reward_per_seller if campaign.maximum_reward_per_seller else ZERO
     if per_seller_cap > 0:
-        earned = Reward.objects.filter(
-            seller=seller,
-            campaign=campaign,
-            status__in=_COUNTED_STATUSES,
-        ).aggregate(total=models.Sum("amount"))["total"] or ZERO
         remaining_for_seller = per_seller_cap - earned
         if remaining_for_seller <= 0:
             raise RewardEngineError(

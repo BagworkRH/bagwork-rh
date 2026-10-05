@@ -138,6 +138,7 @@ REST_FRAMEWORK = {
         "config.throttling.AdminThrottle",
         "config.throttling.AuthThrottle",
         "config.throttling.WalletThrottle",
+        "config.throttling.SubmissionThrottle",
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
@@ -147,6 +148,10 @@ REST_FRAMEWORK = {
         "auth": os.environ.get("THROTTLE_AUTH", "10/hour"),
         "admin": os.environ.get("THROTTLE_ADMIN", "120/hour"),
         "wallet": os.environ.get("THROTTLE_WALLET", "30/hour"),
+        # Post submission leads to a payout, so its ceiling sits far below the
+        # general `user` rate: 1000/hour is a scraping guard, not an anti-abuse
+        # control. A creator submitting by hand never approaches this.
+        "submit": os.environ.get("THROTTLE_SUBMIT", "20/hour"),
     },
 }
 

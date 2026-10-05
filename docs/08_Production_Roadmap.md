@@ -113,20 +113,54 @@ but guarded a door nobody could walk through.
 
 **Done when:** an operator can create and launch a campaign without a shell.
 
-## Stage 5 — Anti-abuse  (under-built relative to its risk)
+## Stage 5 — Anti-abuse  — DONE
 
-The fixed-reward model makes post-farming the central threat. Today it is a
-stub, and there is no rate limiting on submit.
+The fixed-reward model makes post-farming the central threat: with no bound on
+*how many* rewards a creator earns, N accounts posting N times earn N x N.
 
-- [ ] Rate limit post submission per account
-- [ ] One payout identity per account; block obvious duplicate payouts
-- [ ] Real `flag_suspicious_activity` signals (burst posting, identical text
-      across accounts, new account + large reward)
-- [ ] Risk queue the review UI can act on; never auto-accuse on a weak signal
-- [ ] Reversal path exercised end-to-end
+The original note called this "a stub" and "no rate limiting". That was out of
+date when re-read — the signal engine, score, review queue and human-decision
+flow all existed — but three real gaps did remain, and all three are closed.
+
+- [x] **Rate limit post submission** — `SubmissionThrottle` at `THROTTLE_SUBMIT`
+       (20/hour). The global user rate was 1000/hour, which is a scraping guard,
+       not an anti-abuse control: it says nothing about one host looping. The
+       Celery discovery path does not use this endpoint, so the real flow is
+       unaffected.
+- [x] **`maximum_rewards_per_seller` enforced at payout.** This was the
+       significant one. The field was validated at campaign creation, stored,
+       and exposed in serializers, then ignored by the reward engine — so a
+       brand setting "3 rewards per creator" paid an unlimited number. Enforced
+       in `apply_caps`, which every payout passes.
+- [x] **Count rewards from PENDING.** The count used `_COUNTED_STATUSES`, which
+       excludes PENDING. A farm's rewards are all PENDING, so the cap counted
+       zero and never fired — verified by a test that first asserted 50 rewards
+       were earned where 15 should have been. `calculate_reward` debits the
+       budget when the row is created, so PENDING is money already promised.
+- [x] **Cross-account signals** — `collect_farm_signals`: identical long-form
+       text across distinct sellers, and one wallet behind several sellers. All
+       pre-existing signals were scoped to a single seller, which is exactly
+       why they missed a farm: from inside one account a farm looks like an
+       ordinary prolific creator.
+- [x] **Signals wired into the scheduled scan.** `evaluate_post` merges both
+       signal sets. Called once, because `queue_flag` *replaces* a subject's
+       signals — two separate calls would have overwritten rather than
+       accumulated evidence.
 
 **Done when:** a scripted farm of N accounts earns materially less than N
-rewards.
+rewards. Tested directly: 5 accounts x 10 posts earns 15, not 50 — payout is
+bounded per account, so extra accounts buy nothing.
+
+**Not done:**
+- **Blocking rather than flagging.** A shared wallet queues a flag but does not
+  stop the payout. Stopping is an enforcement decision, and the design rule is
+  never auto-accuse on a signal. The caps bound the loss meanwhile, so the
+  urgency is lower than it would otherwise be — but a reviewer still has to be
+  in the loop.
+- **Reversal path exercised end-to-end.** `REVERSED` correctly releases a slot,
+  but no reversal has ever run against a live reward.
+- **Review UI.** Flags are actionable via the staff API and Django admin; there
+  is no purpose-built review screen.
 
 ## Stage 6 — Money actually moves  (blocked on funding)
 

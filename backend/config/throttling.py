@@ -93,3 +93,25 @@ class WalletThrottle(PathScopedThrottle):
         is_mutation = request.method in {"POST", "PUT", "PATCH", "DELETE"}
         is_authorization = request.path.endswith("/authorization/")
         return is_mutation or is_authorization
+
+
+class SubmissionThrottle(PathScopedThrottle):
+    """Tight per-IP limit on post submission — the entry point to a payout.
+
+    The global `UserRateThrottle` allows 1000/hour, which is a scraping guard,
+    not an anti-abuse control: it does nothing about a burst of submissions
+    from one host, and post-farming is exactly a burst. A creator has no reason
+    to submit more than a handful of posts an hour by hand, so a low ceiling
+    costs a legitimate user nothing and bounds a script to a crawl.
+
+    Discovery (the Celery path) does not go through this endpoint, so the real
+    product flow is unaffected by this limit.
+    """
+
+    scope = "submit"
+    path_prefixes = ("/api/v1/posts/submit/",)
+
+    def applies_to(self, request):
+        if not super().applies_to(request):
+            return False
+        return request.method == "POST"

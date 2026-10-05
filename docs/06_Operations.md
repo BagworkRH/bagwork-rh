@@ -18,9 +18,10 @@ classes in `backend/config/throttling.py`:
 | `wallet` | `/api/v1/claims/*` mutations + the EIP-712 authorization GET | 30/hour per IP |
 | `anon`   | every anonymous request            | 100/hour per IP |
 | `user`   | every authenticated request        | 1000/hour per user |
+| `submit` | `POST /api/v1/social/submissions/` (post intake that leads to a payout) | 20/hour per user |
 
 Tune with `THROTTLE_AUTH`, `THROTTLE_ADMIN`, `THROTTLE_WALLET`,
-`THROTTLE_ANON`, `THROTTLE_USER`. Throttled clients receive HTTP 429.
+`THROTTLE_ANON`, `THROTTLE_USER`, `THROTTLE_SUBMIT`. Throttled clients receive HTTP 429.
 
 Each scoped throttle resolves its rate from settings on every request, so a
 `THROTTLE_*` change applies without a restart of the web/worker processes. A

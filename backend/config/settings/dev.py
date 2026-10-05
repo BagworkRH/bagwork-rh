@@ -35,13 +35,17 @@ else:
 # tightened via env vars if you want to exercise throttling locally.
 # A new dict is built (rather than mutating the imported one) so `base` keeps
 # its own untouched copy of the production rates.
+#
+# Scope names are *derived* from base rather than listed here. Hand-listing
+# meant every new throttle scope had to be added in two places, and forgetting
+# the second produced a 500 on every request in the whole suite — because
+# `PathScopedThrottle.get_rate` correctly raises for a scope with no rate —
+# instead of one clear failure at the point of the mistake.
+_BASE_RATES = REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     "DEFAULT_THROTTLE_RATES": {
-        "anon": os.environ.get("THROTTLE_ANON", "100000/hour"),
-        "user": os.environ.get("THROTTLE_USER", "100000/hour"),
-        "auth": os.environ.get("THROTTLE_AUTH", "100000/hour"),
-        "admin": os.environ.get("THROTTLE_ADMIN", "100000/hour"),
-        "wallet": os.environ.get("THROTTLE_WALLET", "100000/hour"),
+        scope: os.environ.get(f"THROTTLE_{scope.upper()}", "100000/hour")
+        for scope in _BASE_RATES
     },
 }

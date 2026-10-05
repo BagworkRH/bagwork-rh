@@ -47,6 +47,11 @@ SIGNAL_WEIGHTS = {
 
 POSTS_PER_DAY_THRESHOLD = 20
 MIN_DUPLICATE_TEXT_LENGTH = 20
+# How many *distinct sellers* posting the identical text makes it a farm
+# pattern rather than a coincidence. Low on purpose: two unrelated creators
+# publishing the same campaign copy verbatim is already unusual, and this only
+# queues evidence for a human, never blocks a payout.
+FARM_MIN_SELLERS = 2
 SPIKE_MIN_DELTA = 500
 SPIKE_MIN_RATIO = 4.0
 SNAPSHOT_PAIR = 2
@@ -182,12 +187,18 @@ def collect_post_signals(post) -> list:
 
 
 def evaluate_post(post, *, actor=None) -> RiskFlag | None:
-    """Score a post and queue a review flag when the score is high enough."""
+    """Score a post — per-post signals *and* cross-account farm signals — then queue.
+
+    Both sets go in a single `queue_flag` call deliberately: that function
+    replaces a subject's existing `signals`, so evaluating them separately would
+    let the second call overwrite the first rather than accumulate evidence.
+    """
+    signals = collect_post_signals(post) + collect_farm_signals(post)
     return queue_flag(
         RiskSubjectType.POST,
         post.pk,
         seller=post.seller,
-        signals=collect_post_signals(post),
+        signals=signals,
         actor=actor,
     )
 
@@ -231,6 +242,70 @@ def evaluate_wallet(wallet, *, actor=None) -> RiskFlag | None:
         ],
         actor=actor,
     )
+
+
+def collect_farm_signals(post) -> list:
+    """Signals that only appear when *many sellers* behave the same way.
+
+    The per-post signals in `collect_post_signals` are all scoped to one seller,
+    which is exactly why they miss the central threat in a fixed-reward
+    campaign: a farm creates N accounts, so from any single account's point of
+    view it looks like an ordinary, if prolific, creator. Detecting it requires
+    looking across sellers, which is what these two signals do.
+
+    Still advisory only. Nothing here mutates a post, reward or claim.
+    """
+    from apps.social.models import SocialPost  # noqa: PLC0415 - lazy import
+
+    signals = []
+
+    # One wallet behind several accounts. This is the strongest evidence
+    # available: the same address collecting several campaigns' payouts is not
+    # something a legitimate creator produces by accident.
+    from apps.wallets.models import Wallet  # noqa: PLC0415 - lazy import
+
+    reuse = []
+    for wallet in Wallet.objects.filter(seller_id=post.seller_id):
+        others = (
+            Wallet.objects.filter(address__iexact=wallet.address)
+            .exclude(seller_id=post.seller_id)
+            .values_list("seller__seller_code", flat=True)
+            .distinct()
+        )
+        reuse.extend(others)
+    if reuse:
+        signals.append(
+            _signal(
+                "wallet_reused_across_sellers",
+                {"other_sellers": sorted(set(reuse)), "count": len(set(reuse))},
+            )
+        )
+
+    # The same text posted by many *different* sellers. A single seller
+    # repeating themselves is already caught by `duplicate_text`; the
+    # cross-account version is the farm signature, and only shows up when the
+    # text is long enough to be a real campaign asset rather than "#".
+    text = (post.text_snapshot or "").strip()
+    if len(text) >= MIN_DUPLICATE_TEXT_LENGTH:
+        distinct_sellers = (
+            SocialPost.objects.filter(text_snapshot=text)
+            .exclude(seller_id=post.seller_id)
+            .values("seller_id")
+            .distinct()
+            .count()
+        )
+        if distinct_sellers >= FARM_MIN_SELLERS:
+            signals.append(
+                _signal(
+                    "duplicate_text",
+                    {
+                        "distinct_other_sellers": distinct_sellers,
+                        "scope": "cross_account",
+                    },
+                )
+            )
+
+    return signals
 
 
 def evaluate_claim_volume(threshold_per_hour: int = 20, *, actor=None) -> dict:
