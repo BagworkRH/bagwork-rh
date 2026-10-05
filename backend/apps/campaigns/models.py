@@ -164,9 +164,11 @@ class BrandFunding(models.Model):
     """
 
     brand = models.ForeignKey(BrandProfile, on_delete=models.PROTECT, related_name="fundings")
-    # 18 decimal places, matching the widest precision the allowlist permits
-    # (USDG is 18, USDC would be 6). A narrower column would round a
-    # deposit off-cent and make it fail to match the payouts it was sent to fund.
+    # 18 decimal places, wider than any allowlisted token needs (USDG, the
+    # funding token, is 6 on both Robinhood Chain networks — read from the
+    # chain, not assumed). A column sized to the narrowest token would have to
+    # be widened later, and widening it rounds existing deposits off-cent, so
+    # they stop matching the payouts they were sent to fund.
     amount = models.DecimalField(max_digits=40, decimal_places=18)
     chain_id = models.PositiveIntegerField()
     token_symbol = models.CharField(

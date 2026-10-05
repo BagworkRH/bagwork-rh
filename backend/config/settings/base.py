@@ -282,6 +282,11 @@ DEFAULT_TOKEN_DECIMALS = int(os.environ.get("TOKEN_DECIMALS", "18"))
 # means a creator's payout holds its value and the platform never converts to
 # fiat, so it is not acting as an exchanger.
 #
+# USDG is 6 decimals on both Robinhood Chain networks (read from the chain, not
+# assumed). Decimals are never taken from this setting — they come from the
+# TokenConfig allowlist at runtime, because quoting a 15% fee at the wrong
+# precision produces a number the chain will not honour.
+#
 # Must be allowlisted for the campaign's chain, or campaigns paying in it are
 # refused at creation (see campaigns.services._validate_token_allowed).
 FUNDING_TOKEN_SYMBOL = os.environ.get("FUNDING_TOKEN_SYMBOL", "USDG")

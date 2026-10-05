@@ -45,10 +45,17 @@ OTHER_TOKEN_ADDRESS = "0x000000000000000000000000000000000000BEEF"
 SENDER = "0x1234567890123456789012345678901234567890"
 STRANGER = "0x9999999999999999999999999999999999999999"
 CHAIN = 46630
-ONE = 10**18  # 1 USDG in 18-decimal base units
+ONE = 10**6  # 1 USDG in base units. USDG is 6 decimals, read from the chain.
 
 
-def allowlist_usdg(decimals=18):
+def allowlist_usdg(decimals=6):
+    """USDG at its real precision.
+
+    6, not the platform's 18 default: read from Robinhood Chain mainnet and
+    testnet rather than assumed. The tests are only meaningful at the true
+    value, because a verifier that read the wrong decimals would scale a real
+    transfer by the wrong power of ten.
+    """
     return make_token_config(
         symbol=TOKEN, chain_id=CHAIN, address=TOKEN_ADDRESS, decimals=decimals
     )

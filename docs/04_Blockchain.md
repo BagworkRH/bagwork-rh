@@ -237,50 +237,73 @@ unfunded one going live.
 
 ### Registering the payout token
 
+```bash
+python manage.py shell -c "
+from apps.blockchain.models import TokenConfig
+TokenConfig.objects.get_or_create(
+    symbol='USDG', chain_id=4663,
+    defaults={'address': '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
+              'decimals': 6, 'enabled': True})"
+```
+
 The token allowlist is what `Campaign.token_symbol` is checked against, so a
 campaign cannot pay in a token the distributor does not hold. There is no
 management command yet — register via Django admin at `/admin/` (TokenConfig),
-or from a shell:
+or from a shell.
+
+### The USDG address, verified on-chain
+
+Robinhood Chain's [token contracts page](https://docs.robinhood.com/chain/contracts/)
+lists exactly two tokens. Both were read directly from the chain on 2026-10-02,
+not copied from the docs page:
+
+| Token | Address | `decimals()` | mainnet (4663) | testnet (46630) |
+| --- | --- | --- | --- | --- |
+| USDG | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | **6** | contract present, `name` = "Global Dollar" | **no contract** |
+| WETH | `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` | 18 | contract present | **no contract** |
+
+`USDG` is an EIP-1967 proxy (170 bytes of code); interact with the proxy, never
+the implementation, which can be upgraded.
+
+**USDG is 6 decimals, not 18.** This is the value the fee arithmetic depends on,
+so it is read from `TokenConfig` at runtime and never hardcoded. Getting it wrong
+scales every transfer by 10^12 and produces quotes the chain will not honour.
+
+**Testnet has neither token deployed.** The addresses above are mainnet and must
+not be registered for chain 46630 — a `TokenConfig` row pointing at them would
+let a campaign pass validation and then fail at payout. The options:
+
+| Option | Consequence |
+| --- | --- |
+| **Develop against mainnet (4663)** | Uses real USDG. Needs mainnet ETH, so it is a real-money environment |
+| **Ask Robinhood for a testnet USDG** | The only way to exercise the flow with test funds. Their developer portal or support |
+| **Fork mainnet locally** | Deterministic rehearsal of the real token's behaviour, no funds needed |
+| **Deploy a test token yourself** | Local only. Never for real payouts, and never on a shared network |
+
+Whichever is used, **verify before registering**:
+
+```python
+from web3 import Web3
+w3 = Web3(Web3.HTTPProvider('https://rpc.mainnet.chain.robinhood.com'))
+addr = Web3.to_checksum_address('0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168')
+assert w3.eth.chain_id == 4663
+assert len(w3.eth.get_code(addr)) > 2, 'no contract at this address'
+print('decimals =', int.from_bytes(w3.eth.call({'to': addr, 'data': '0x313ce567'}), 'big'))
+```
+
+`decimals()` must match what you register, and the chain id must match the row.
+
+To register (mainnet, once the address has been confirmed for the chain you are
+on):
 
 ```bash
 python manage.py shell -c "
 from apps.blockchain.models import TokenConfig
 TokenConfig.objects.get_or_create(
-    symbol='USDG', chain_id=46630,
-    defaults={'address': '<TESTNET ADDRESS>', 'decimals': 18, 'enabled': True})"
+    symbol='USDG', chain_id=4663,
+    defaults={'address': '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
+              'decimals': 6, 'enabled': True})"
 ```
-
-### ⚠️ Robinhood Chain does not document a USDG contract
-
-Checked against the chain on 2026-09-27. Robinhood Chain's documented token
-contracts are **WETH** and **USDG** (Global Dollar). No USDG contract is
-listed, and the USDG address published in the docs returns **no contract code**
-on testnet (`eth_getCode` → `0x`), which is expected because that address is a
-mainnet address.
-
-So the USDG rail this build assumes cannot be enabled as written. Before going
-further, pick one:
-
-| Option | Consequence |
-| --- | --- |
-| **Use USDG** | Aligns with the chain. USDG is Paxos's Global Dollar, a dollar stablecoin, so the "no volatility for creators" property holds |
-| **Find the real testnet USDG address** | If Robinhood has since deployed one. Must be verified on-chain (`eth_getCode` non-empty, `decimals()` = 6), not copied from a docs page |
-| **Deploy test USDG yourself** | Only for local testing; never for real payouts |
-
-**Verify any address on-chain before registering it.** A wrong or empty address
-on the allowlist means a campaign that passes validation but cannot pay:
-
-```python
-from web3 import Web3
-w3 = Web3(Web3.HTTPProvider('https://rpc.testnet.chain.robinhood.com'))
-addr = Web3.to_checksum_address('<ADDRESS>')
-assert len(w3.eth.get_code(addr)) > 2, 'no contract at this address'
-print('decimals =', w3.eth.call({'to': addr, 'data': '0x313ce567'}).hex())
-```
-
-`decimals()` must match what you register. Getting this wrong is exactly the
-class of bug the decimals fix addressed — a quote computed at the wrong
-precision is a quote the chain will not honour.
 
 ## Treasury
 Admin treasury separated from app wallets. Multisig for meaningful balances.
