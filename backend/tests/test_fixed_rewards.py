@@ -214,11 +214,57 @@ class ProviderOriginalityMappingTests(TestCase):
         self.assertFalse(payload["is_quote"])
 
     def test_repost_is_detected(self):
+        # `retweeted` is what X actually returns (verified against the live
+        # API); the fixture used to say "reposted", which X never sends, so
+        # this assertion passed while every real retweet was treated as
+        # original and paid.
         payload = OfficialXProvider.normalize_post(
-            {"id": "1", "text": "rt", "referenced_tweets": [{"type": "reposted", "id": "99"}]}
+            {"id": "1", "text": "rt", "referenced_tweets": [{"type": "retweeted", "id": "99"}]}
         )
         self.assertTrue(payload["is_repost"])
         self.assertFalse(payload["is_quote"])
+
+    def test_live_payload_shapes_are_mapped_correctly(self):
+        """Verbatim shapes captured from the live X API.
+
+        Stage 2's point is that the documented contract and the real one are
+        not the same thing. These payloads were copied from actual responses,
+        so a future change to the mapping breaks here instead of at payout
+        time. Note that an original post omits `referenced_tweets` entirely,
+        while a retweet carries `type: "retweeted"`.
+        """
+        original = {
+            "created_at": "2026-10-06T11:40:02.000Z",
+            "edit_history_tweet_ids": ["2107435709401325699"],
+            "id": "2107435709401325699",
+            "text": "CoinMarketCap | RWA Stocks",
+        }
+        mapped = OfficialXProvider.normalize_post(original)
+        self.assertFalse(mapped["is_repost"])
+        self.assertFalse(mapped["is_quote"])
+        self.assertEqual(mapped["created_at"], "2026-10-06T11:40:02.000+00:00")
+
+        retweet = {
+            "created_at": "2026-10-06T11:50:59.000Z",
+            "edit_history_tweet_ids": ["2107435825478656295"],
+            "id": "2107435825478656295",
+            "text": "RT @someone: their original words",
+            "referenced_tweets": [{"type": "retweeted", "id": "2107432167689384018"}],
+        }
+        mapped = OfficialXProvider.normalize_post(retweet)
+        self.assertTrue(mapped["is_repost"])
+        self.assertFalse(mapped["is_quote"])
+
+    def test_unknown_reference_type_fails_closed(self):
+        """An unrecognised type must not be assumed original.
+
+        The gate exists to stop paying for amplification, so a type we do not
+        recognise is treated as non-original rather than waved through.
+        """
+        payload = OfficialXProvider.normalize_post(
+            {"id": "1", "text": "?", "referenced_tweets": [{"type": "some_future_type", "id": "9"}]}
+        )
+        self.assertTrue(payload["is_repost"])
 
     def test_quote_is_detected(self):
         payload = OfficialXProvider.normalize_post(

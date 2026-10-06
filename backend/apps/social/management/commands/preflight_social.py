@@ -21,7 +21,7 @@ from django.utils import timezone
 from apps.social.models import SocialPlatform
 from apps.social.providers import provider_mode
 from apps.social.providers.base import SocialProviderError
-from apps.social.providers.official import OfficialXProvider
+from apps.social.providers.official import OfficialXProvider, _rfc3339
 from apps.social.providers.tiktok import OfficialTikTokProvider
 
 # Never echoed, only reported as present/absent.
@@ -137,7 +137,11 @@ class Command(BaseCommand):
             identity["provider_user_id"],
             {
                 "max_results": 5,
-                "start_time": (timezone.now() - timedelta(days=7)).isoformat(),
+                # Must go through the adapter's formatter: X rejects the
+                # microsecond precision a raw `.isoformat()` produces, which
+                # made this probe report a failure that the real discovery
+                # path (which uses `_rfc3339`) never had.
+                "start_time": _rfc3339(timezone.now() - timedelta(days=7)),
                 "exclude": "retweets,replies",
                 "tweet.fields": "created_at,text,referenced_tweets",
             },

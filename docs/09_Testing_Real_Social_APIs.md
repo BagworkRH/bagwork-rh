@@ -29,17 +29,21 @@ want write access for a read-only discovery product).
 
 **b. Register the callback URL exactly:**
 ```
-http://localhost:8000/api/v1/x/callback/
+http://127.0.0.1:8000/api/v1/x/x/callback/
 ```
-X rejects a trailing-slash mismatch, so copy it precisely. It must also be a URL
-you can actually receive — see step 4 for the local tunnel.
+Note the doubled `x`: social routes are mounted at `/api/v1/x/` and the
+per-platform path adds the platform again (`x/<platform>/callback/`). Registering
+`/api/v1/x/callback/` (one `x`) fails with X's generic "Something went wrong"
+page and no callback ever arrives. X matches the string exactly, so the host
+matters too: `localhost` and `127.0.0.1` are different values to X even though
+they are the same machine.
 
 **c. Write `.env` in the repo root** (never commit this file):
 ```
 SOCIAL_PROVIDER_MODE=official
 X_CLIENT_ID=your-consumer-key
 X_CLIENT_SECRET=your-consumer-secret
-X_REDIRECT_URI=http://localhost:8000/api/v1/x/callback/
+X_REDIRECT_URI=http://127.0.0.1:8000/api/v1/x/x/callback/
 ```
 
 **d. Check configuration, no network:**
@@ -61,10 +65,24 @@ python manage.py runserver
 python manage.py preflight_social --call x --verbose
 ```
 
-You want to see your handle, then real posts with `reposted=False`. If
-`referenced_tweets` is absent from the raw payload, Stage 1's originality gate
-is reading a field that does not exist — that is the single most important thing
-this step can tell you.
+You want to see your handle, then real posts with `is_repost=False`.
+
+### What the first live run actually found
+
+Verified on 2026-10-06 against `GET /2/users/:id/timelines/reverse_chronological`.
+Every one of these was invisible to a suite built on guessed fixtures:
+
+| Finding | Consequence |
+| --- | --- |
+| `referenced_tweets[].type` is **`retweeted`**, not `reposted` | The originality gate tested for `"reposted"`, so it never matched. Every real retweet was recorded `PROVIDER_CONFIRMED` and was payable. `quoted` was correct, which is why quotes were caught and the gap stayed hidden. |
+| The real enum is `retweeted \| quoted \| replied_to` | Any other value now fails closed rather than being assumed original. |
+| An original post **omits** `referenced_tweets` entirely | Absence is normal and means original; do not read a missing key as an error. |
+| `start_time` rejects microsecond precision | X's pattern is `yyyy-MM-dd'T'HH:mm:ss[.SSS]X`. Django's `timezone.now()` carries microseconds, so the first real discovery call failed with HTTP 400 until `_rfc3339` truncated to milliseconds. |
+| `exclude=retweets,replies` hides retweets from discovery | The bug survived in production-shaped runs because the filter removed the very posts that would have exposed it. Manual submission was the exposed path. |
+
+Fixing the fixtures mattered as much as fixing the code: `test_refreshed_repost_fails_verification`
+— the end-to-end "a repost cannot earn" guarantee — had been asserting against
+`"reposted"`, so it passed while the gate was open.
 
 ## 2. TikTok, end to end
 
@@ -72,7 +90,8 @@ TikTok requires an approved app before `video.list` returns anything.
 
 1. developers.tiktok.com → Create App → choose **Content Posting API**.
 2. Request `user.info.basic` and `video.list`.
-3. Set the redirect URL to `http://localhost:8000/api/v1/tiktok/callback/`.
+3. Set the redirect URL to `http://127.0.0.1:8000/api/v1/x/tiktok/callback/`
+   (note `/x/tiktok/` — social routes are mounted under `/x/` for every platform).
 4. **Submit for review.** This is the wait. Meanwhile test X.
 5. Make one **public** video. `video/list` only returns public posts.
 6. `python manage.py preflight_social --call tiktok --verbose`

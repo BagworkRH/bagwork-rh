@@ -19,6 +19,12 @@ from .base import SocialProvider, SocialProviderError
 # different platform's PKCE verifier or OAuth state.
 SESSION_PREFIX = "social_oauth"
 
+# X's `referenced_tweets[].type` values, confirmed against the live API.
+# `retweeted` is the one that matters: the original code tested for "reposted",
+# which X never returns, so every real retweet was recorded as an original and
+# was therefore payable.
+KNOWN_REFERENCE_TYPES = frozenset({"retweeted", "quoted", "replied_to"})
+
 
 def _pkce_challenge(verifier: str) -> str:
     digest = hashlib.sha256(verifier.encode("utf-8")).digest()
@@ -26,16 +32,29 @@ def _pkce_challenge(verifier: str) -> str:
 
 
 def _rfc3339(value) -> str:
-    """Format a datetime as RFC 3339, which is what X's start_time/end_time want.
+    """Format a datetime as RFC 3339 with at most millisecond precision.
 
-    X's docs describe these as `date-time`; it rejects a bare date, so the
-    offset is always included explicitly.
+    X rejects a bare date, so the offset is always included explicitly — and,
+    found against the live API, it also rejects *microsecond* precision. Its
+    own error message gives the accepted pattern as
+    `yyyy-MM-dd'T'HH:mm:ss[.SSS]X`, i.e. seconds plus at most milliseconds.
+    Django's `timezone.now()` carries microseconds, so without this truncation
+    the first real discovery call fails with HTTP 400.
     """
     if value is None:
         return ""
     if value.tzinfo is None:
         value = timezone.make_aware(value, dt_timezone.utc)
-    return value.astimezone(dt_timezone.utc).isoformat().replace("+00:00", "Z")
+    value = value.astimezone(dt_timezone.utc).replace(microsecond=(value.microsecond // 1000) * 1000)
+    text = value.isoformat().replace("+00:00", "Z")
+    # `isoformat` always prints six fractional digits; X's pattern allows at
+    # most three, so drop the trailing zeros: .558000 -> .558, .000 -> (none).
+    if "." in text:
+        head, tail = text.split(".", 1)
+        digits, suffix = tail[:-1], tail[-1:]  # keep the trailing Z aside
+        digits = digits.rstrip("0")
+        text = f"{head}.{digits}{suffix}" if digits else f"{head}{suffix}"
+    return text
 
 
 class OfficialXProvider(SocialProvider):
@@ -164,6 +183,13 @@ class OfficialXProvider(SocialProvider):
         `referenced_tweets` is how X marks a repost or a quote; without it we
         cannot tell a creator's own post from amplification of someone else's,
         which is the difference between earning a reward and not.
+
+        The type strings are X's, verified against the live API rather than
+        taken from documentation: it returns `retweeted`, not `reposted`. That
+        distinction cost real money in principle — a retweet whose type we
+        failed to recognise was recorded as an original, provider-confirmed
+        post and therefore payable. The fixtures had encoded the same guess, so
+        the suite stayed green while the gate was open.
         """
         refs = raw.get("referenced_tweets") or []
         ref_types = {ref.get("type") for ref in refs}
@@ -171,12 +197,19 @@ class OfficialXProvider(SocialProvider):
         if created_at:
             # X returns ISO-8601 with a trailing Z; make it explicit.
             created_at = created_at.replace("Z", "+00:00")
+
+        # X's documented enum is retweeted | quoted | replied_to. A reply is
+        # the creator's own words, so it is not amplification; anything else
+        # means the post is not wholly the creator's, and an unrecognised type
+        # must fail closed rather than be assumed original.
+        unrecognised = ref_types - KNOWN_REFERENCE_TYPES
+        is_repost = "retweeted" in ref_types or bool(unrecognised)
         return {
             "post_id": str(raw.get("id", "")),
             "text": raw.get("text", ""),
             "created_at": created_at,
             "post_url": f"https://x.com/i/status/{raw.get('id', '')}",
-            "is_repost": "reposted" in ref_types,
+            "is_repost": is_repost,
             "is_quote": "quoted" in ref_types,
         }
 

@@ -97,8 +97,8 @@ def _report_post(post):
     print()
     print("        What this means:")
     print("        - types '-' on an ORIGINAL post is correct.")
-    print("        - types 'reposted' on a post you reposted is correct.")
-    print("        Our normalize_post() looks for exactly those two strings.")
+    print("        - types 'retweeted' on a post you reposted is correct.")
+    print("        Our normalize_post() looks for exactly those strings.")
     print("        If this post is original and shows 'reposted', STOP: the")
     print("        originality gate would misjudge it and needs fixing.")
 
@@ -251,7 +251,7 @@ def main():
             text = (post.get("text") or "")[:45].replace("\n", " ")
             print(f"          id={post['id']:<20} refs={kinds:<10} {text!r}")
         print("\n        normalize_post() expects referenced_tweets[].type to be")
-        print("        'reposted' or 'quoted'. If every row shows '-', including for")
+        print("        'retweeted' or 'quoted'. If every row shows '-', including for")
         print("        posts you reposted, the originality gate needs revisiting.")
 
     print("\nDone. Paste the whole output here -- it contains no tokens.")

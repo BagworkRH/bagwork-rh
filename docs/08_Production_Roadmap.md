@@ -45,21 +45,58 @@ reward. Prove it by breaking the provider and asserting nothing is paid.
 **Not done (Stage 8):** alerting on provider unavailability. Right now it is
 logged, not paged.
 
-## Stage 2 — Real API credentials  (blocked on us, not engineering)
+## Stage 2 — Real API credentials  (X DONE, TikTok blocked on review)
 
-Neither adapter has ever been called against a live API. Everything in Stage 1
-is a hypothesis until this happens.
+Neither adapter had ever been called against a live API. Everything in Stage 1
+was a hypothesis until this happened — and the first live call proved the
+suspicion right.
 
-- [ ] X developer app, PKCE credentials into env
-- [ ] TikTok app, Content Posting API credentials into env
-- [ ] Confirm the real shape of `referenced_tweets` matches `normalize_post`
-- [ ] One end-to-end connect -> discover -> verify -> reward, per platform
-- [ ] Record actual response shapes as contract fixtures
+**X — verified 2026-10-06.** Credentials are configured, an OAuth 2.0 + PKCE
+connect completed in a browser, and a real account (`@IsaacMadu9`) was linked
+and read back through the real timeline endpoint.
+
+- [x] X developer app, PKCE credentials into env
+- [x] Real OAuth connect → callback → token exchange → account linked
+- [x] `users/me` and the timeline endpoint return real data
+- [x] Confirm the real shape of `referenced_tweets` matches `normalize_post`
+      — **it did not.** X returns `type: "retweeted"`; the code tested for
+      `"reposted"`. See below.
+- [x] Record actual response shapes as contract fixtures
+      (live payloads pinned in `ProviderOriginalityMappingTests`)
+- [ ] One end-to-end connect -> discover -> verify -> reward, on a funded campaign
+- [ ] TikTok app, Content Posting API credentials into env (blocked on app review)
+
+**The bug the live run caught.** `normalize_post` decided originality with
+`"reposted" in ref_types`. X never sends that string. So every real retweet was
+recorded `PROVIDER_CONFIRMED` and was therefore **payable** — a creator could
+retweet someone else's campaign post and be paid the fixed reward for it.
+
+Two things had kept it invisible:
+
+1. **Fixtures encoded the same guess.** `test_refreshed_repost_fails_verification`
+   — the end-to-end "a repost cannot earn" test — passed because it asserted
+   against `"reposted"` too. A suite built on a wrong assumption cannot refute it.
+2. **`exclude=retweets,replies`** removes retweets from discovery, so the
+   production-shaped path never carried the posts that would expose it. The
+   exposed path was manual submission, where `refresh_post_facts` re-fetches the
+   post and re-derives originality.
+
+The fix matches the real enum and fails closed on anything unrecognised. Live
+verification: **0 of 62 reference-bearing posts were flagged before; 49 are now.**
+Observed type histogram is exactly `retweeted: 50, quoted: 10, replied_to: 2` —
+no unrecognised values, so the fail-closed branch has no untested tail.
+
+Also found and fixed on the same run: `start_time` rejects microsecond precision
+(X's pattern is `yyyy-MM-dd'T'HH:mm:ss[.SSS]X`), which made the first real
+discovery call fail with HTTP 400. `preflight_social` had its own copy of that
+bug, so the verification tool would have misreported the adapter.
 
 **Done when:** a real post on each platform pays out correctly, and a real
-repost on each platform is rejected.
+repost on each platform is rejected. X's repost rejection is now proven against
+real payloads; the TikTok half still waits on app review.
 
-**Risk if skipped:** Stage 1 may be hardening a field name we guessed.
+**Still open:** TikTok credentials, and a full connect → discover → verify →
+reward against a funded campaign (which needs the funding loop from Stage 6).
 
 
 

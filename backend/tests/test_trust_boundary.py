@@ -131,7 +131,7 @@ class ProviderFactRefreshTests(TestCase):
             {
                 "id": "999000111",
                 "text": "actually a repost",
-                "referenced_tweets": [{"type": "reposted", "id": "42"}],
+                "referenced_tweets": [{"type": "retweeted", "id": "42"}],
             }
         )
         self.post.refresh_from_db()
@@ -151,12 +151,14 @@ class ProviderFactRefreshTests(TestCase):
 
     def test_refreshed_repost_fails_verification(self):
         # The end-to-end guarantee: a repost cannot earn even when the seller
-        # submitted it as original.
+        # submitted it as original. The fixture must use the type X actually
+        # returns (`retweeted`); while it said "reposted" this test passed
+        # against a value the live API never sends, so it proved nothing.
         self._run(
             {
                 "id": "999000111",
                 "text": "my brilliant original #ad",
-                "referenced_tweets": [{"type": "reposted", "id": "42"}],
+                "referenced_tweets": [{"type": "retweeted", "id": "42"}],
             }
         )
         self.post.refresh_from_db()

@@ -89,12 +89,14 @@ export interface XConnectResult {
 
 /** Start the X (Twitter) OAuth authorization flow. */
 export async function startXConnect(): Promise<XConnectResult> {
-  return apiRequest<XConnectResult>("/api/v1/x/connect/", {
+  // The platform segment appears twice: social routes are mounted under
+  // /api/v1/x/ for every platform, so X's connect path is /x/x/connect/.
+  return apiRequest<XConnectResult>("/api/v1/x/x/connect/", {
     method: "POST",
     auth: true,
   });
 }
 
 export async function disconnectX(): Promise<void> {
-  return apiRequest<void>("/api/v1/x/disconnect/", { method: "POST", auth: true });
+  return apiRequest<void>("/api/v1/x/x/disconnect/", { method: "POST", auth: true });
 }

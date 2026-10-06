@@ -40,7 +40,7 @@ X_TIMELINE = {
             "id": "222",
             "text": "a repost of someone else #ad",
             "created_at": "2026-09-01T13:00:00.000Z",
-            "referenced_tweets": [{"type": "reposted", "id": "999"}],
+            "referenced_tweets": [{"type": "retweeted", "id": "999"}],
         },
     ]
 }
@@ -106,6 +106,13 @@ class XDiscoveryRequestTests(TestCase):
     def test_timestamps_are_rfc3339(self):
         self.assertTrue(_rfc3339(timezone.now()).endswith("Z"))
         self.assertEqual(_rfc3339(None), "")
+        # Found against the live API: X rejects microsecond precision with
+        # HTTP 400, accepting at most milliseconds. Django's timezone.now()
+        # carries microseconds, so the formatter must truncate — the exact
+        # input every discovery call passes.
+        stamp = _rfc3339(timezone.now())
+        fraction = stamp.split(".")[1][:-1] if "." in stamp else ""
+        self.assertLessEqual(len(fraction), 3)
 
 
 class TikTokDiscoveryTests(TestCase):
