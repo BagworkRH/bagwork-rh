@@ -8,10 +8,12 @@ state to real creators being paid real money.
 
 Solid: the multi-platform provider layer, the fixed-reward policy, the
 originality/disclosure gates, and the trust boundary that stops a seller from
-self-reporting their way to a payout.
+self-reporting their way to a payout. Anti-abuse bounds the loss per account and
+queues cross-account evidence for review.
 
-Thin: neither provider has touched a real API, the discovery path that *is* the
-product does not exist, and anti-abuse is a stub.
+Proven live: X discovery, verification and reward calculation now run against
+the real API — a real retweet was correctly refused and a real original paid.
+The testnet reward token remains the keystone.
 
 ## Stage 0 — Unblock ourselves  (blocking everything)  — DONE
 
@@ -63,7 +65,9 @@ and read back through the real timeline endpoint.
       `"reposted"`. See below.
 - [x] Record actual response shapes as contract fixtures
       (live payloads pinned in `ProviderOriginalityMappingTests`)
-- [ ] One end-to-end connect -> discover -> verify -> reward, on a funded campaign
+- [x] One end-to-end connect -> discover -> verify -> reward, live (2026-10-06)
+      — run on a staff campaign, which skips the brand funding gate by design
+- [ ] The same on a brand-funded campaign (needs the funding loop from Stage 6)
 - [ ] TikTok app, Content Posting API credentials into env (blocked on app review)
 
 **The bug the live run caught.** `normalize_post` decided originality with
@@ -100,7 +104,7 @@ reward against a funded campaign (which needs the funding loop from Stage 6).
 
 
 
-## Stage 3 — Discovery, the actual product  — DONE (unverified against a live API)
+## Stage 3 — Discovery, the actual product  — DONE (verified live on X)
 
 Creators previously pasted a URL into a test endpoint. `discover_posts` raised on
 both adapters. Discovery is now implemented for both platforms and scheduled.
@@ -118,8 +122,26 @@ both adapters. Discovery is now implemented for both platforms and scheduled.
 **Done when:** a creator who links an account and posts gets the reward with no
 manual step.
 
-**Verified only against stubs.** Both adapters match the documented contract, not
-a live response. See Stage 2 — this is the code Stage 2 will exercise.
+**Verified live on X (2026-10-06).** The first real run ingested **98 posts** from a
+connected account's live timeline in one poll, and the originality split was
+correct on real data: originals recorded `PROVIDER_CONFIRMED`, quotes recorded
+`PROVIDER_REJECTED`. Verification then moved an original to `VERIFIED` and the
+reward engine produced a `5 TST` PENDING reward — connect -> discover -> verify
+-> reward, on real posts, with no manual step.
+
+The rejection path was proven the same way, using a genuine retweet from that
+timeline whose raw payload is `[{"id": "...", "type": "retweeted"}]`:
+
+```
+after refresh: is_repost=True is_quote=False evidence=PROVIDER_REJECTED
+verify       : NOT_ORIGINAL  "Post is a repost, not original content; not eligible for a reward."
+reward       : none
+```
+
+Before the Stage 2 fix that same post verified as an original and paid out. Also
+confirmed here: a post whose account link is missing fail-closes to
+`PROVIDER_ERROR` rather than being assumed original — the same fail-closed
+principle, reached by a different route.
 
 **Known limits:**
 - One timeline page per poll (X `max_results=100`). A creator posting more than
