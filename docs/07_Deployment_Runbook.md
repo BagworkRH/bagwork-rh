@@ -85,6 +85,17 @@ console.log('address:', w.address); console.log('key:', w.privateKey)"
 
 Fund it with testnet ETH from the Robinhood Chain faucet, then confirm:
 
+- **Official faucet: <https://faucet.testnet.chain.robinhood.com>** — confirmed on
+  Robinhood's own support page ("You can get testnet tokens at
+  faucet.testnet.chain.robinhood.com"). Use this first.
+- Fallback: <https://www.alchemy.com/faucets/robinhood-testnet> (0.1 ETH / 24h,
+  no account) — but Alchemy's eligibility requires ~0.001 ETH **on Ethereum
+  mainnet plus real mainnet activity**, which a freshly generated deployer key
+  will not have. Do not expect this one to work for a new address.
+
+A two-contract deploy on this L2 costs cents, so one drip is ample. Never send
+mainnet ETH to this key.
+
 ```bash
 node -e "const {JsonRpcProvider,formatEther}=require('ethers');\
 new JsonRpcProvider('https://rpc.testnet.chain.robinhood.com')\
