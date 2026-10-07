@@ -31,6 +31,39 @@ export class ApiError extends Error {
   }
 }
 
+/** Turn a snake_case model field into words a person can read: `reward_rate` -> `Reward rate`. */
+function humanizeField(field: string): string {
+  const spaced = field.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * Build a readable message from a DRF error body.
+ *
+ * The backend answers validation failures in two shapes: a flat
+ * `{"detail": "..."}` for domain rules raised by the service, and a per-field
+ * map like `{"reward_rate": ["A fixed reward per post must be greater than
+ * zero."]}` for serializer field errors. The per-field shape is the common one
+ * when creating a campaign, and collapsing it to "Request failed" would hide
+ * exactly which field the brand must fix, so it is spelled out here.
+ */
+function describeError(data: unknown): string {
+  if (typeof data === "string" && data) return data;
+  if (Array.isArray(data)) return JSON.stringify(data);
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    if (typeof record.detail === "string" && record.detail) return record.detail;
+    const parts: string[] = [];
+    for (const [field, value] of Object.entries(record)) {
+      const text = Array.isArray(value) ? value.map(String).join(" ") : String(value);
+      if (!text) continue;
+      parts.push(field === "non_field_errors" ? text : `${humanizeField(field)}: ${text}`);
+    }
+    if (parts.length > 0) return parts.join(" · ");
+  }
+  return "Request failed";
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
@@ -61,10 +94,7 @@ export async function apiRequest<T>(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const detail =
-      (data as { detail?: string }).detail ||
-      (Array.isArray(data) ? JSON.stringify(data) : "Request failed");
-    throw new ApiError(response.status, String(detail));
+    throw new ApiError(response.status, describeError(data));
   }
 
   return data as T;

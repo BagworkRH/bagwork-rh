@@ -122,6 +122,35 @@ export interface Campaign {
   created_at: string;
 }
 
+/**
+ * Create/update payload for a campaign, mirroring the backend's
+ * `CampaignWriteSerializer`. Only staff and brand accounts may send it; a brand
+ * that sends it is recorded as the campaign's funder by the backend, so the
+ * payload deliberately carries no brand id — it cannot be attributed to
+ * someone else's money.
+ *
+ * `reward_model` is fixed to FIXED at launch: only a fixed reward per verified
+ * original post is offered, so the field is present for clarity but not a free
+ * choice. The budget must cover at least one payout, and `end_at` must be
+ * after `start_at` — both enforced server-side and mirrored in the form.
+ */
+export interface CampaignCreateInput {
+  name: string;
+  slug: string;
+  description?: string;
+  project_name: string;
+  token_symbol: string;
+  chain_id: number;
+  budget: string;
+  reward_model: RewardModel;
+  reward_rate: string;
+  maximum_reward_per_seller?: string;
+  maximum_rewards_per_seller?: number;
+  start_at: string;
+  end_at: string;
+  requirements_json?: Record<string, unknown>;
+}
+
 export type PostVerificationStatus =
   | "DISCOVERED"
   | "BASIC_VALIDATION"

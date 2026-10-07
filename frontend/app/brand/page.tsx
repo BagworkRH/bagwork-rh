@@ -109,9 +109,14 @@ export default function BrandDashboardPage() {
           <h1>{profile.company_name}</h1>
           <p className="muted">Brand dashboard</p>
         </div>
-        <span className={profile.status === "ACTIVE" ? "badge badge-ok" : "badge"}>
-          {profile.status}
-        </span>
+        <div className="row">
+          <span className={profile.status === "ACTIVE" ? "badge badge-ok" : "badge"}>
+            {profile.status}
+          </span>
+          <Link href="/brand/create" className="btn btn-primary btn-sm">
+            Create a campaign
+          </Link>
+        </div>
       </div>
 
       {profile.status !== "ACTIVE" && (
