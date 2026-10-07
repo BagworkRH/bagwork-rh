@@ -4,6 +4,8 @@ from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APIClient
 
 from apps.social.models import (
     OriginalityEvidence,
@@ -145,6 +147,64 @@ class PostDiscoveryTests(TestCase):
                 "collected_at": timezone.now(),
             },
             actor=user,
+
         )
         self.assertEqual(result.verification_status, PostVerificationStatus.VERIFIED)
         self.assertTrue(PostMetricSnapshot.objects.filter(post=post).exists())
+
+
+class SocialConnectionsEndpointTests(TestCase):
+    """`GET /api/v1/x/connections/` must report linked accounts, and only yours.
+
+    Separate from `platforms/`, which lists what this build *can* connect. A
+    client needs to know what *is* connected before offering a disconnect --
+    otherwise the only way to find out is to call disconnect and read the 404.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user, self.profile = make_user()
+
+    def test_anonymous_cannot_list_connections(self):
+        self.client.force_authenticate(None)
+        resp = self.client.get("/api/v1/x/connections/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_seller_with_no_accounts_gets_an_empty_list(self):
+        self.client.force_authenticate(self.user)
+        resp = self.client.get("/api/v1/x/connections/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["connections"], [])
+
+    def test_linked_account_is_reported(self):
+        SocialAccount.objects.create(
+            seller=self.profile,
+            platform=SocialPlatform.X,
+            provider_user_id="42",
+            username="seller",
+        )
+        self.client.force_authenticate(self.user)
+        resp = self.client.get("/api/v1/x/connections/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        rows = resp.data["connections"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["platform"], "x")
+        self.assertEqual(rows[0]["username"], "seller")
+        # Credential material must never cross the wire.
+        self.assertNotIn("encrypted_credentials", rows[0])
+
+    def test_only_returns_the_callers_own_accounts(self):
+        """A second seller's link must not appear in this seller's list."""
+        other_user, other_profile = make_user(
+            email="other@example.com", username="other"
+        )
+        SocialAccount.objects.create(
+            seller=other_profile,
+            platform=SocialPlatform.X,
+            provider_user_id="99",
+            username="other-seller",
+        )
+        self.client.force_authenticate(self.user)
+        resp = self.client.get("/api/v1/x/connections/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["connections"], [])

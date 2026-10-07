@@ -135,24 +135,56 @@ export type PostVerificationStatus =
   | "DUPLICATE"
   | "OUTSIDE_CAMPAIGN_WINDOW"
   | "REQUIREMENT_MISSING"
+  | "NOT_ORIGINAL"
+  | "NOT_DISCLOSED"
   | "ACCOUNT_NOT_CONNECTED"
   | "PROVIDER_ERROR"
   | "SUSPICIOUS_ACTIVITY";
 
+export type SocialPlatform = "x" | "tiktok";
+
+export type SocialAccountStatus = "CONNECTED" | "PENDING" | "ERROR" | "REVOKED";
+
+/**
+ * A seller's linked account as returned by `GET /api/v1/x/connections/`.
+ *
+ * Credential material is deliberately absent: tokens are encrypted at rest and
+ * never serialised to the client, so the only fields exposed are the ones a
+ * creator needs to see their own link status.
+ */
+export interface SocialAccount {
+  platform: SocialPlatform;
+  username: string;
+  display_name: string;
+  status: SocialAccountStatus;
+  connected_at: string;
+  last_synced_at: string | null;
+}
+
+/**
+ * A creator's own post as returned by `GET /api/v1/me/posts/`.
+ *
+ * `rejection_reason` explains a failed verification in prose so the creator can
+ * correct it. `originality_evidence` records how the originality claim was
+ * established -- a post that was never provider-confirmed cannot earn, which is
+ * why the field is surfaced rather than kept server-side.
+ */
 export interface SocialPost {
   id: number;
+  platform: SocialPlatform;
   external_post_id: string;
   post_url: string;
   campaign: string | null;
-  seller_code: string;
   published_at: string | null;
   verification_status: PostVerificationStatus;
   rejection_reason: string;
+  is_original: boolean;
+  originality_evidence: string;
   impressions: number;
   likes: number;
   reposts: number;
   replies: number;
-  last_metrics_sync: string | null;
+  total_engagement: number;
 }
 
 export type RewardStatus =

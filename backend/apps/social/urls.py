@@ -8,6 +8,7 @@ app_name = "social"
 # never be completed against the wrong provider.
 urlpatterns = [
     path("platforms/", views.platforms, name="platforms"),
+    path("connections/", views.connections, name="connections"),
     path("<str:platform>/connect/", views.connect, name="connect"),
     path("<str:platform>/callback/", views.callback, name="callback"),
     path("<str:platform>/disconnect/", views.disconnect, name="disconnect"),

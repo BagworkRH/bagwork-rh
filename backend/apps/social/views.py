@@ -125,3 +125,40 @@ def platforms(request):
             "mock": is_mock(),
         }
     )
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def connections(request):
+    """The signed-in seller's linked accounts, one entry per platform.
+
+    Deliberately separate from `platforms/`: that endpoint says what this build
+    *can* connect, this one says what *you* have connected. Without it the UI
+    has to guess whether a platform is already linked before offering to
+    disconnect it, and that guess surfaces as a 404 against `disconnect`.
+    """
+    seller = getattr(request.user, "seller_profile", None)
+    if seller is None:
+        return _no_seller()
+
+    accounts = seller.social_accounts.all().order_by("-connected_at")
+    return Response(
+        {
+            "connections": [
+                {
+                    "platform": a.platform,
+                    "username": a.username,
+                    "display_name": a.display_name,
+                    "status": a.status,
+                    "connected_at": a.connected_at.isoformat(),
+                    "last_synced_at": a.last_synced_at.isoformat()
+                    if a.last_synced_at
+                    else None,
+                }
+                for a in accounts
+            ],
+            # Mirror `platforms/` so a client can tell mock from real in one call.
+            "mock": is_mock(),
+        }
+    )
