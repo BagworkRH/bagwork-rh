@@ -7,6 +7,8 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network robinhoodTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network robinhood",
     "deploy:local": "hardhat run scripts/deploy.ts"
   },
   "devDependencies": {
@@ -18,6 +20,7 @@
     "@types/mocha": "^10.0.7",
     "@types/node": "^20.14.10",
     "chai": "^4.4.1",
+    "dotenv": "^18.0.6",
     "ethers": "^6.13.2",
     "hardhat": "^2.22.10",
     "mocha": "^10.7.3",

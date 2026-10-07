@@ -54,8 +54,8 @@ cd ../frontend && npm ci
 Confirm the whole toolchain is green **before** touching a chain:
 
 ```bash
-cd backend      && .venv/bin/python manage.py test tests   # 171 tests
-cd ../contracts/src/reward_token && npm ci && npx hardhat test   # 4 tests
+cd backend      && .venv/bin/python manage.py test tests   # 347 tests
+cd ../contracts/src/reward_token && npm ci && npx hardhat test   # 11 tests
 cd ../../frontend && npm run build
 ```
 
@@ -106,9 +106,13 @@ new JsonRpcProvider('https://rpc.testnet.chain.robinhood.com')\
 
 ```bash
 cd contracts/src/reward_token
-export DEPLOYER_PRIVATE_KEY=0xYOUR_TESTNET_KEY
-npx hardhat run scripts/deploy.ts --network robinhoodTestnet
+cp .env.example .env          # then set DEPLOYER_PRIVATE_KEY inside it
+npm run deploy:testnet        # == npx hardhat run scripts/deploy.ts --network robinhoodTestnet
 ```
+
+`hardhat.config.ts` loads `.env` automatically (via `dotenv/config`), so the key
+does **not** need exporting into the shell. `.env` is gitignored; `.env.example`
+lists what it expects.
 
 The script deploys `RewardToken` then
 `RewardDistributor(token, signer, treasury)` and prints every address you need.

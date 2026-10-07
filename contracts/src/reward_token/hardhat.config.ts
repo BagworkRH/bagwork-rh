@@ -1,3 +1,10 @@
+// Loads `.env` from this directory into process.env at config-evaluation time.
+// Must be imported before anything reads an env var below: the `networks`
+// object resolves DEPLOYER_PRIVATE_KEY at module scope, so without this the
+// key sitting in `.env` is invisible and hardhat reports "No signer available".
+// `.env` is gitignored; see `.env.example` for the keys it expects.
+import "dotenv/config";
+
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 
