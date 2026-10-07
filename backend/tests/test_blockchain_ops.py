@@ -6,12 +6,14 @@ blockchain status/control endpoints, and the claim-expiry task.
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.blockchain import services as chain
-from apps.blockchain.models import PlatformControl
+from apps.blockchain.models import PlatformControl, TokenConfig
 from apps.blockchain.tasks import (
     expire_stale_claims,
     monitor_anomalous_claims,
@@ -194,3 +196,36 @@ class ScheduledTaskTests(TestCase):
             expired_at=timezone.now() + timedelta(hours=1),
         )
         self.assertEqual(expire_stale_claims()["expired"], 0)
+
+
+class RegisterTokenCommandTests(TestCase):
+    """`manage.py register_token` is how a token (e.g. the testnet USDG) gets allowlisted."""
+
+    def test_registers_a_new_token(self):
+        call_command("register_token", symbol="usdg", chain_id=46630, address=TOKEN, decimals=6)
+        token = TokenConfig.objects.get(symbol="USDG")
+        self.assertEqual(token.chain_id, 46630)
+        self.assertEqual(token.address, TOKEN)
+        self.assertEqual(token.decimals, 6)
+        self.assertTrue(token.enabled)
+
+    def test_upserts_by_symbol_instead_of_duplicating(self):
+        make_token_config(symbol="USDG", chain_id=46630, address=TOKEN, decimals=18)
+        call_command("register_token", symbol="USDG", chain_id=46630, address=TOKEN, decimals=6)
+        self.assertEqual(TokenConfig.objects.filter(symbol="USDG").count(), 1)
+        self.assertEqual(TokenConfig.objects.get(symbol="USDG").decimals, 6)
+
+    def test_rejects_a_malformed_address(self):
+        with self.assertRaises(CommandError):
+            call_command("register_token", symbol="USDG", chain_id=46630, address="nope", decimals=6)
+
+    def test_rejects_an_address_already_used_by_another_symbol(self):
+        make_token_config(symbol="TST", chain_id=46630, address=TOKEN, decimals=18)
+        with self.assertRaises(CommandError):
+            call_command("register_token", symbol="USDG", chain_id=46630, address=TOKEN, decimals=6)
+
+    def test_disable_flag_registers_but_disabled(self):
+        call_command(
+            "register_token", symbol="USDG", chain_id=46630, address=TOKEN, decimals=6, disable=True
+        )
+        self.assertFalse(TokenConfig.objects.get(symbol="USDG").enabled)

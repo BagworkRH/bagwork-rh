@@ -106,7 +106,7 @@ new JsonRpcProvider('https://rpc.testnet.chain.robinhood.com')\
 
 ```bash
 cd contracts/src/reward_token
-cp .env.example .env          # then set DEPLOYER_PRIVATE_KEY inside it
+cp .env.example .env          # then set DEPLOYER_PRIVATE_KEY (and PAYOUT_TOKEN_ADDRESS) inside it
 npm run deploy:testnet        # == npx hardhat run scripts/deploy.ts --network robinhoodTestnet
 ```
 
@@ -114,9 +114,19 @@ npm run deploy:testnet        # == npx hardhat run scripts/deploy.ts --network r
 does **not** need exporting into the shell. `.env` is gitignored; `.env.example`
 lists what it expects.
 
-The script deploys `RewardToken` then
-`RewardDistributor(token, signer, treasury)` and prints every address you need.
-It **refuses to run** if the EIP-712 domain name in the contract does not match
+The deploy has two rails, chosen by `PAYOUT_TOKEN_ADDRESS`:
+
+- **Unset (development):** deploys the mintable `RewardToken` and wires the
+  distributor to it, so creators are paid in that dev token.
+- **Set to an existing ERC-20 (the USDG rail):** deploys **only** the
+  `RewardDistributor`, wired to that token — the token brands fund with and
+  creators are paid in. The script reads its `symbol` and `decimals` on-chain and
+  prints the `TokenConfig` row to register (USDG is **6** decimals). This is the
+  production wiring: the distributor must pay the same token the funding rail
+  credits, or a funded campaign promises a payout the contract cannot deliver.
+
+`RewardDistributor(token, signer, treasury)` prints every address you need. It
+**refuses to run** if the EIP-712 domain name in the contract does not match
 `EIP712_DOMAIN_NAME` (default `bagworkRH`) — see §9.
 
 Set `TREASURY_ADDRESS` to a **multisig** before mainnet. If it is unset the
@@ -128,7 +138,7 @@ Record:
 | Variable | Value |
 | --- | --- |
 | `CHAIN_ID` | `46630` |
-| `REWARD_TOKEN_ADDRESS` | printed by the script |
+| `REWARD_TOKEN_ADDRESS` | printed by the script (its payout token — USDG when `PAYOUT_TOKEN_ADDRESS` is set) |
 | `CONTRACT_ADDRESS` | printed by the script |
 | `TREASURY_ADDRESS` | printed by the script (multisig on mainnet) |
 | `CLAIM_SIGNER_ADDRESS` | printed by the script |

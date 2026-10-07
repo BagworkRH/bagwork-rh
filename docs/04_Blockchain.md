@@ -238,18 +238,14 @@ unfunded one going live.
 ### Registering the payout token
 
 ```bash
-python manage.py shell -c "
-from apps.blockchain.models import TokenConfig
-TokenConfig.objects.get_or_create(
-    symbol='USDG', chain_id=4663,
-    defaults={'address': '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-              'decimals': 6, 'enabled': True})"
+python manage.py register_token --symbol USDG --chain-id 4663 \
+    --address 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168 --decimals 6
 ```
 
 The token allowlist is what `Campaign.token_symbol` is checked against, so a
-campaign cannot pay in a token the distributor does not hold. There is no
-management command yet — register via Django admin at `/admin/` (TokenConfig),
-or from a shell.
+campaign cannot pay in a token the distributor does not hold. `register_token`
+upserts by symbol, so it is safe to re-run; the same command registers the
+testnet USDG once that address is known.
 
 ### The USDG address, verified on-chain
 

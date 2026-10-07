@@ -221,14 +221,24 @@ bounded per account, so extra accounts buy nothing.
 - **Review UI.** Flags are actionable via the staff API and Django admin; there
   is no purpose-built review screen.
 
-## Stage 6 — Money actually moves  (blocked on funding)
+## Stage 6 — Money actually moves  (unblocked: testnet token available)
 
 The contract compiles and its tests pass, but no reward has ever been claimed
-on-chain. This is the step that makes the product real and the step nobody can
-do for us.
+on-chain. This is the step that makes the product real.
 
+The testnet stablecoin was the blocker; an address is now available. The deploy
+script can wire the distributor to an existing token (`PAYOUT_TOKEN_ADDRESS`) so
+creators are paid in the same token brands fund with, and `register_token`
+scripts the allowlist entry instead of a shell snippet.
+
+- [ ] Register the testnet USDG (`python manage.py register_token`) and set
+      `FUNDING_TREASURY_ADDRESS`
+- [x] Deploy against an existing token (`PAYOUT_TOKEN_ADDRESS`) instead of only
+      the dev `RewardToken`
+- [x] `register_token` command for the token allowlist (was admin/shell only)
 - [ ] Funded deployer key on Robinhood Chain
-- [ ] Deploy `RewardToken`, record address
+- [ ] Deploy the `RewardDistributor` (external-token mode), verify the domain
+      separator (§4), record addresses
 - [ ] One real claim, verified against a block explorer
 - [ ] Failover: what happens if the RPC or contract is unavailable at claim time
 
