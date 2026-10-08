@@ -220,13 +220,13 @@ SENTRY_DSN=https://...@o0.ingest.sentry.io/1
 ENVIRONMENT=production
 ```
 
-Register the payout token, or no campaign can pay in it. This is the testnet
-rehearsal token — a community USDG, because Robinhood deploys none on testnet
-(see `04_Blockchain.md`):
+Register the payout token, or no campaign can pay in it. This is the official
+Robinhood Testnet USDG, issued by Paxos (see `04_Blockchain.md`; get test funds
+from the Paxos faucet):
 
 ```bash
 .venv/bin/python manage.py register_token --symbol USDG --chain-id 46630 \
-    --address 0x915Ef7c9F9f80a69e3BE47A38EE0Bb47607103ec --decimals 6
+    --address 0x7E955252E15c84f5768B83c41a71F9eba181802F --decimals 6
 ```
 
 Then gate on the deploy check, which fails fast on unsafe production config:

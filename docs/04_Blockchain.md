@@ -265,28 +265,24 @@ the implementation, which can be upgraded.
 so it is read from `TokenConfig` at runtime and never hardcoded. Getting it wrong
 scales every transfer by 10^12 and produces quotes the chain will not honour.
 
-**Robinhood's token contracts are mainnet-only.** Neither USDG nor WETH is
-deployed on testnet (46630), so the addresses above must never be registered for
-46630 — a `TokenConfig` row pointing at them would let a campaign pass
-validation and then fail at payout. Robinhood publishes no testnet stablecoin,
-so the testnet explorer is instead full of third-party/"Mock USDG" tokens, and
-any testnet token is test funds rather than a settlement token.
-
-For the Stage 6 testnet rehearsal we use a third-party testnet USDG, read
-directly from the chain on 2026-10-07:
+**USDG on testnet is deployed by Paxos, not Robinhood.** Robinhood's own
+token-contracts page is mainnet-only, so the addresses above must never be
+registered for 46630 — a `TokenConfig` row pointing at them would let a campaign
+pass validation and then fail at payout. The testnet USDG is published by Paxos
+(the issuer) and was read directly from the chain on 2026-10-07:
 
 | Token | Address | `decimals()` | note |
 | --- | --- | --- | --- |
-| USDG (testnet, third-party) | `0x915Ef7c9F9f80a69e3BE47A38EE0Bb47607103ec` | **6** | symbol `USDG`, ~5.6 kB of code. **Not** a Robinhood token |
+| USDG (Robinhood Testnet, Paxos) | `0x7E955252E15c84f5768B83c41a71F9eba181802F` | **6** | name `Global Dollar`; supply-control `0x4549bb98c667aAb626627C118102c28065E8f54C` |
 
-The options for a testnet stablecoin were:
+Identify the real token by this address, never by the symbol: the testnet
+explorer is full of look-alike "Mock USDG" contracts. Test funds are still test
+funds — never a payout token in production.
 
-| Option | Consequence |
-| --- | --- |
-| **Develop against mainnet (4663)** | Uses real USDG. Needs mainnet ETH, so it is a real-money environment |
-| **Use a community testnet USDG** | What the rehearsal does. Test funds; never a payout token in production |
-| **Fork mainnet locally** | Deterministic rehearsal of the real token's behaviour, no funds needed |
-| **Deploy a test token yourself** | Local only. Never for real payouts, and never on a shared network |
+Testnet USDG comes from the **Paxos faucet** (<https://faucet.paxos.com/>,
+select Robinhood Testnet), the source for Paxos-issued test assets. The
+Robinhood, QuickNode and Chainlink faucets dispense ETH and simulated Stock
+Tokens — **not** USDG.
 
 Whichever is used, **verify before registering**:
 
