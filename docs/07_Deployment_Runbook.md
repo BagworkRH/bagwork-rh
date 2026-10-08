@@ -248,6 +248,15 @@ curl -s -H "Authorization: Token $STAFF_TOKEN" \
 Expect `"chain_enabled": true`, `"signer_configured": true`, and
 `"signer_address"` matching `CLAIM_SIGNER_ADDRESS`.
 
+Before the first claim, fund the distributor's escrow. Claims are paid from the
+distributor's own balance, not the funding treasury EOA, so an unfunded escrow
+reverts with `InsufficientEscrow`:
+
+```bash
+cd contracts/src/reward_token
+DISTRIBUTOR_ADDRESS=<the deployed distributor> ESCROW_DEPOSIT=50 npm run fund:escrow:testnet
+```
+
 Then, end to end, as a seller:
 
 1. Onboard, connect a wallet, verify ownership.

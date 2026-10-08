@@ -9,7 +9,9 @@
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network robinhoodTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy.ts --network robinhood",
-    "deploy:local": "hardhat run scripts/deploy.ts"
+    "deploy:local": "hardhat run scripts/deploy.ts",
+    "fund:escrow:testnet": "hardhat run scripts/fund-escrow.ts --network robinhoodTestnet",
+    "fund:escrow:local": "hardhat run scripts/fund-escrow.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.7",
