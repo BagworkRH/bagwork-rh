@@ -202,15 +202,31 @@ X_PROVIDER=official
 
 RPC_URL=https://robinhood-testnet.g.alchemy.com/v2/<KEY>   # provider, not public RPC
 CHAIN_ID=46630
-REWARD_TOKEN_ADDRESS=0x...
+REWARD_TOKEN_ADDRESS=0x...   # the distributor's payout token (USDG, below)
 CONTRACT_ADDRESS=0x...
 CLAIM_SIGNER=0x...            # secret manager only
 CLAIM_SIGNER_ADDRESS=0x...
 TOKEN_DECIMALS=18
 EIP712_DOMAIN_NAME=bagworkRH  # must match RewardDistributor.sol
 
+# Funding rail (Spec 04). Brands send USDG to FUNDING_TREASURY_ADDRESS, and a
+# deposit is only credited when a receipt shows the allowlisted token paying
+# exactly that address. Left blank, no deposit can ever be confirmed.
+FUNDING_TOKEN_SYMBOL=USDG
+FUNDING_TREASURY_ADDRESS=0x...
+FUNDING_CONFIRMATIONS=3
+
 SENTRY_DSN=https://...@o0.ingest.sentry.io/1
 ENVIRONMENT=production
+```
+
+Register the payout token, or no campaign can pay in it. This is the testnet
+rehearsal token — a community USDG, because Robinhood deploys none on testnet
+(see `04_Blockchain.md`):
+
+```bash
+.venv/bin/python manage.py register_token --symbol USDG --chain-id 46630 \
+    --address 0x915Ef7c9F9f80a69e3BE47A38EE0Bb47607103ec --decimals 6
 ```
 
 Then gate on the deploy check, which fails fast on unsafe production config:

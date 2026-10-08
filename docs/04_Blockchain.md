@@ -265,14 +265,26 @@ the implementation, which can be upgraded.
 so it is read from `TokenConfig` at runtime and never hardcoded. Getting it wrong
 scales every transfer by 10^12 and produces quotes the chain will not honour.
 
-**Testnet has neither token deployed.** The addresses above are mainnet and must
-not be registered for chain 46630 — a `TokenConfig` row pointing at them would
-let a campaign pass validation and then fail at payout. The options:
+**Robinhood's token contracts are mainnet-only.** Neither USDG nor WETH is
+deployed on testnet (46630), so the addresses above must never be registered for
+46630 — a `TokenConfig` row pointing at them would let a campaign pass
+validation and then fail at payout. Robinhood publishes no testnet stablecoin,
+so the testnet explorer is instead full of third-party/"Mock USDG" tokens, and
+any testnet token is test funds rather than a settlement token.
+
+For the Stage 6 testnet rehearsal we use a third-party testnet USDG, read
+directly from the chain on 2026-10-07:
+
+| Token | Address | `decimals()` | note |
+| --- | --- | --- | --- |
+| USDG (testnet, third-party) | `0x915Ef7c9F9f80a69e3BE47A38EE0Bb47607103ec` | **6** | symbol `USDG`, ~5.6 kB of code. **Not** a Robinhood token |
+
+The options for a testnet stablecoin were:
 
 | Option | Consequence |
 | --- | --- |
 | **Develop against mainnet (4663)** | Uses real USDG. Needs mainnet ETH, so it is a real-money environment |
-| **Ask Robinhood for a testnet USDG** | The only way to exercise the flow with test funds. Their developer portal or support |
+| **Use a community testnet USDG** | What the rehearsal does. Test funds; never a payout token in production |
 | **Fork mainnet locally** | Deterministic rehearsal of the real token's behaviour, no funds needed |
 | **Deploy a test token yourself** | Local only. Never for real payouts, and never on a shared network |
 
@@ -293,12 +305,8 @@ To register (mainnet, once the address has been confirmed for the chain you are
 on):
 
 ```bash
-python manage.py shell -c "
-from apps.blockchain.models import TokenConfig
-TokenConfig.objects.get_or_create(
-    symbol='USDG', chain_id=4663,
-    defaults={'address': '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-              'decimals': 6, 'enabled': True})"
+python manage.py register_token --symbol USDG --chain-id 4663 \
+    --address 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168 --decimals 6
 ```
 
 ## Treasury
