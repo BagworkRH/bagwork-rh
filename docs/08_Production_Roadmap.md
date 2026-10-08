@@ -221,28 +221,30 @@ bounded per account, so extra accounts buy nothing.
 - **Review UI.** Flags are actionable via the staff API and Django admin; there
   is no purpose-built review screen.
 
-## Stage 6 — Money actually moves  (unblocked: testnet token available)
+## Stage 6 — Money actually moves  — DONE (testnet)
 
-The contract compiles and its tests pass, but no reward has ever been claimed
-on-chain. This is the step that makes the product real.
+A reward has now been claimed on-chain. This is the step that makes the product
+real, and it is complete on Robinhood Chain testnet.
 
-The testnet stablecoin was the blocker; an address is now available. The deploy
-script can wire the distributor to an existing token (`PAYOUT_TOKEN_ADDRESS`) so
-creators are paid in the same token brands fund with, and `register_token`
-scripts the allowlist entry instead of a shell snippet.
+The testnet stablecoin was the blocker. USDG on testnet is deployed by **Paxos**
+(not Robinhood) at `0x7E955252E15c84f5768B83c41a71F9eba181802F` (6 decimals), and
+test funds come from the Paxos faucet. The deploy script wires the distributor to
+an existing token (`PAYOUT_TOKEN_ADDRESS`); `register_token` scripts the
+allowlist entry; `fund-escrow`, `prepare_claim` and `submit-claim` drive the
+rehearsal.
 
-- [ ] Register the testnet USDG (`python manage.py register_token`) and set
-      `FUNDING_TREASURY_ADDRESS`
-- [x] Deploy against an existing token (`PAYOUT_TOKEN_ADDRESS`) instead of only
-      the dev `RewardToken`
+- [x] Register the testnet USDG (`register_token`) and set `FUNDING_TREASURY_ADDRESS`
+- [x] Deploy against an existing token (`PAYOUT_TOKEN_ADDRESS`), not only the dev `RewardToken`
 - [x] `register_token` command for the token allowlist (was admin/shell only)
-- [ ] Funded deployer key on Robinhood Chain
-- [ ] Deploy the `RewardDistributor` (external-token mode), verify the domain
-      separator (§4), record addresses
-- [ ] One real claim, verified against a block explorer
-- [ ] Failover: what happens if the RPC or contract is unavailable at claim time
+- [x] Funded deployer key on Robinhood Chain
+- [x] Deploy the `RewardDistributor`; the on-chain `DOMAIN_SEPARATOR` matches
+      `build_domain_separator(46630, CONTRACT_ADDRESS)`
+- [x] One real claim settled on the explorer (`0x371589bd…50071e`): the creator
+      received exactly the signed amount and the 15% fee accrued to treasury
+- [x] Failover: an unavailable signer/contract at claim time still creates the
+      claim and returns 503 with a reason (`test_claim_authorization.py`)
 
-**Done when:** a claim settles on a public explorer.
+**Done when:** a claim settles on a public explorer. — **met.**
 
 ## Stage 7 — Frontend parity
 
