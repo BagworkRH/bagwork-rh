@@ -7,7 +7,7 @@ at once — they are independent accounts, not alternatives.
 from django.http import Http404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import SocialPlatform
@@ -113,9 +113,14 @@ def disconnect(request, platform):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def platforms(request):
-    """Which platforms this build can connect."""
+    """Which platforms this build can connect.
+
+    Public: it describes the build's capabilities, not the caller's data. The
+    onboarding UI needs it before a user links anything, and it reveals nothing
+    about who is connected — that is the authenticated `connections` endpoint.
+    """
     return Response(
         {
             "platforms": [

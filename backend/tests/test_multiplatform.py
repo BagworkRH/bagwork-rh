@@ -151,6 +151,15 @@ class PlatformApiTests(TestCase):
         self.assertIn("x", ids)
         self.assertIn("tiktok", ids)
 
+    def test_list_platforms_is_public(self):
+        # Available platforms describe the build, not the caller, and onboarding
+        # needs them before anyone has a session; requiring auth left the list
+        # empty for the very screen that lists them.
+        anonymous = APIClient()
+        resp = anonymous.get("/api/v1/x/platforms/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data["platforms"])
+
     def test_connect_accepts_a_platform(self):
         with override_settings(SOCIAL_PROVIDER_MODE="mock"):
             resp = self.client.post("/api/v1/x/x/connect/")
