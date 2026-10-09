@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import * as brandApi from "@/services/brand";
 import { FUNDING_TOKEN_SYMBOL, shortenAddress } from "@/lib/constants";
+import { formatAmount } from "@/lib/money";
 import type {
   BrandCampaignFunding,
   BrandFunding,
@@ -180,17 +181,6 @@ function statusHint(status: string): string {
   return "Your brand is pending review. You can prepare funding, but staff activate brands after onboarding.";
 }
 
-/** Format a stablecoin amount for display. Trims trailing zeros: the API returns
- *  18-decimal strings because the fee arithmetic runs in token units, and
- *  showing "575.000000000000000000" would read as a bug to a brand. */
-function formatAmount(value: string): string {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return value;
-  return num.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 /** First step: create the brand. Idempotent server-side, so a double-click
  *  cannot produce two brands for one user. */
 function BrandOnboard({

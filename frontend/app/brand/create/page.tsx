@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { FUNDING_TOKEN_SYMBOL, SUPPORTED_NETWORKS } from "@/lib/constants";
+import { formatAmount } from "@/lib/money";
 import { getBrandProfile, getQuote } from "@/services/brand";
 import { createCampaign, launchCampaign } from "@/services/campaigns";
 import type { BrandProfile, BrandQuote, Campaign } from "@/types";
@@ -729,15 +730,4 @@ function CreatedPanel({ campaign, isBrand }: { campaign: Campaign; isBrand: bool
       </div>
     </div>
   );
-}
-
-/** Trim trailing zeros: the API returns 18-decimal strings because the money
- *  arithmetic runs in token units, and "575.000000000000000000" reads as a bug. */
-function formatAmount(value: string): string {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return value;
-  return num.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }

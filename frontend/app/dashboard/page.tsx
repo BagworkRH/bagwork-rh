@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { formatAmount } from "@/lib/money";
+import { getMyCampaigns } from "@/services/campaigns";
 import { getMyPosts } from "@/services/social";
-import type { SellerDashboard, SocialPost } from "@/types";
+import type { JoinedCampaign, SellerDashboard, SocialPost } from "@/types";
 
 /**
  * Verification statuses still being worked on by the pipeline. Anything else
@@ -80,6 +82,10 @@ export default function DashboardPage() {
   const [postsState, setPostsState] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  const [campaigns, setCampaigns] = useState<JoinedCampaign[]>([]);
+  const [campaignsState, setCampaignsState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
 
   useEffect(() => {
     if (user) {
@@ -98,6 +104,18 @@ export default function DashboardPage() {
         setPostsState("ready");
       })
       .catch(() => setPostsState("error"));
+  }, [user]);
+
+  // And a third, for the same reason: which campaigns this seller is actually in,
+  // which the public campaign list cannot say because it does not know who asks.
+  useEffect(() => {
+    if (!user) return;
+    getMyCampaigns()
+      .then((data) => {
+        setCampaigns(data);
+        setCampaignsState("ready");
+      })
+      .catch(() => setCampaignsState("error"));
   }, [user]);
 
   if (loading) {
@@ -141,9 +159,10 @@ export default function DashboardPage() {
     );
   }
 
+  // Money is formatted for reading; the counts alongside it are already integers.
   const cards = [
-    { label: "Total earnings", value: dashboard.total_earnings },
-    { label: "Available to claim", value: dashboard.available_to_claim },
+    { label: "Total earnings", value: formatAmount(dashboard.total_earnings) },
+    { label: "Available to claim", value: formatAmount(dashboard.available_to_claim) },
     { label: "Pending rewards", value: String(dashboard.pending_rewards) },
     { label: "Posts tracked", value: String(dashboard.posts_tracked) },
     { label: "Verified posts", value: String(dashboard.verified_posts) },
@@ -222,11 +241,53 @@ export default function DashboardPage() {
 
       <div className="grid grid-3" style={{ marginTop: 20 }}>
         <div className="card">
-          <h3>Active campaigns</h3>
-          <p className="muted">Campaigns you have joined appear here.</p>
-          <Link href="/campaigns" className="btn btn-outline btn-sm">
-            Browse campaigns
-          </Link>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h3>Your campaigns</h3>
+            <Link href="/campaigns" className="btn btn-outline btn-sm">
+              Browse campaigns
+            </Link>
+          </div>
+
+          {campaignsState === "loading" && (
+            <p className="muted">Loading your campaigns…</p>
+          )}
+          {campaignsState === "error" && (
+            <div className="banner banner-error">
+              Could not load your campaigns. Refresh to try again.
+            </div>
+          )}
+          {campaignsState === "ready" && campaigns.length === 0 && (
+            <p className="muted">
+              You have not joined a campaign yet. Browse the live ones to start
+              earning.
+            </p>
+          )}
+          {campaignsState === "ready" && campaigns.length > 0 && (
+            <ul className="joined-campaigns">
+              {campaigns.map((c) => (
+                <li
+                  key={c.campaign_id}
+                  className="row"
+                  style={{ justifyContent: "space-between" }}
+                >
+                  <span>
+                    <Link href={`/campaigns/${c.slug}`}>{c.name}</Link>{" "}
+                    <span
+                      className={`badge ${c.campaign_status === "ACTIVE" ? "badge-ok" : ""}`}
+                    >
+                      {c.campaign_status}
+                    </span>{" "}
+                    <span className="muted">
+                      {formatAmount(c.reward_rate)} {c.token_symbol} per post
+                    </span>
+                  </span>
+                  <span className="money">
+                    {formatAmount(c.cumulative_reward)} {c.token_symbol}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className="card">
           <h3>Social accounts</h3>

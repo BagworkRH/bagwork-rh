@@ -2,10 +2,39 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { formatAmount } from "@/lib/money";
+import { joinCampaign } from "@/services/campaigns";
 import type { Campaign } from "@/types";
 
 export default function CampaignCard({ campaign }: { campaign: Campaign }) {
-  const [joined, setJoined] = useState(campaign.joined);
+  // `campaign.joined` is the source of truth once the seller's memberships have
+  // been loaded; the local flag covers the moment just after joining, before that
+  // list has been re-read.
+  const [joinedLocally, setJoinedLocally] = useState(false);
+  const joined = campaign.joined || joinedLocally;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Joining is a server fact, not a button state.
+   *
+   * The participation is what the dashboard lists and what discovery matches
+   * posts against, so the card only reads "Joined" once the backend has actually
+   * recorded it — flipping a local flag would show a creator they were enrolled
+   * when nothing was.
+   */
+  async function handleJoin() {
+    setBusy(true);
+    setError(null);
+    try {
+      await joinCampaign(campaign.id);
+      setJoinedLocally(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not join this campaign.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <article className="card campaign-card">
@@ -25,19 +54,19 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
         <div>
           <dt>Budget</dt>
           <dd>
-            {campaign.budget} {campaign.token_symbol}
+            {formatAmount(campaign.budget)} {campaign.token_symbol}
           </dd>
         </div>
         <div>
           <dt>Reward</dt>
           <dd>
-            {campaign.reward_rate} {campaign.token_symbol}
+            {formatAmount(campaign.reward_rate)} {campaign.token_symbol}
           </dd>
         </div>
         <div>
           <dt>Remaining</dt>
           <dd>
-            {campaign.remaining_budget} {campaign.token_symbol}
+            {formatAmount(campaign.remaining_budget)} {campaign.token_symbol}
           </dd>
         </div>
       </dl>
@@ -51,12 +80,15 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
         ) : (
           <button
             className="btn btn-primary btn-sm"
-            onClick={() => setJoined(true)}
+            disabled={busy}
+            onClick={() => void handleJoin()}
           >
-            Join campaign
+            {busy ? "Joining…" : "Join campaign"}
           </button>
         )}
       </div>
+
+      {error && <div className="banner banner-error">{error}</div>}
     </article>
   );
 }

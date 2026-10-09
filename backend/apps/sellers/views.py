@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.serializers import UserSerializer
+from apps.campaigns.models import CampaignParticipation
 from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.models import Reward, RewardStatus
 from apps.social.models import PostVerificationStatus, SocialPost
@@ -232,6 +233,50 @@ def my_claims(request):
             for c in claims
         ]
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_campaigns(request):
+    """The campaigns the signed-in seller has joined, newest first.
+
+    The public campaign list answers "what exists"; only this answers "what am I
+    in, and have I earned anything from it yet" — which is the question a creator
+    has the moment after joining.
+    """
+    profile = getattr(request.user, "seller_profile", None)
+    if profile is None:
+        return Response({"detail": "No seller profile."}, status=status.HTTP_404_NOT_FOUND)
+
+    participations = (
+        CampaignParticipation.objects.filter(seller=profile)
+        .select_related("campaign")
+        .order_by("-joined_at")
+    )
+    return Response([_joined_campaign_payload(p) for p in participations])
+
+
+def _joined_campaign_payload(participation):
+    """One joined campaign, from the seller's side of the participation.
+
+    Money stays a string: the ledger keeps 18 decimals and the UI rounds for
+    display, so nothing here pre-judges how many places a figure needs.
+    """
+    campaign = participation.campaign
+    return {
+        "campaign_id": campaign.pk,
+        "slug": campaign.slug,
+        "name": campaign.name,
+        "campaign_status": campaign.status,
+        "token_symbol": campaign.token_symbol,
+        "reward_model": campaign.reward_model,
+        "reward_rate": str(campaign.reward_rate),
+        "remaining_budget": str(campaign.remaining_budget),
+        "end_at": campaign.end_at.isoformat(),
+        "participation_status": participation.status,
+        "joined_at": participation.joined_at.isoformat(),
+        "cumulative_reward": str(participation.cumulative_reward),
+    }
 
 
 @api_view(["GET"])

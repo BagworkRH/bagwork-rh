@@ -159,6 +159,11 @@ textarea:focus-visible, summary:focus-visible {
   border-radius: 999px;
 }
 
+/* Campaigns a seller has joined, listed on the dashboard. */
+.joined-campaigns { list-style: none; margin: 12px 0 0; padding: 0; }
+.joined-campaigns li { padding: 8px 0; border-top: var(--hairline); }
+.joined-campaigns li:first-child { border-top: none; padding-top: 0; }
+
 /* Cards / hero / sections */
 .card {
   background: var(--bg-elevated);

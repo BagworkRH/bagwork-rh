@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+import { formatAmount } from "@/lib/money";
 import type { Campaign } from "@/types";
 
 async function getCampaign(slug: string): Promise<Campaign | null> {
@@ -38,13 +39,13 @@ export default async function CampaignDetailPage({
           <div>
             <dt>Budget</dt>
             <dd>
-              {campaign.budget} {campaign.token_symbol}
+              {formatAmount(campaign.budget)} {campaign.token_symbol}
             </dd>
           </div>
           <div>
             <dt>Remaining</dt>
             <dd>
-              {campaign.remaining_budget} {campaign.token_symbol}
+              {formatAmount(campaign.remaining_budget)} {campaign.token_symbol}
             </dd>
           </div>
           <div>
@@ -54,12 +55,12 @@ export default async function CampaignDetailPage({
           <div>
             <dt>Rate</dt>
             <dd>
-              {campaign.reward_rate} {campaign.token_symbol}
+              {formatAmount(campaign.reward_rate)} {campaign.token_symbol}
             </dd>
           </div>
           <div>
             <dt>Max / seller</dt>
-            <dd>{campaign.maximum_reward_per_seller}</dd>
+            <dd>{formatAmount(campaign.maximum_reward_per_seller)}</dd>
           </div>
           <div>
             <dt>Chain</dt>
@@ -70,7 +71,7 @@ export default async function CampaignDetailPage({
         <h3>Reward rules</h3>
         <ul>
           <li>Model: {campaign.reward_model}</li>
-          <li>Rate: {campaign.reward_rate} per unit</li>
+          <li>Rate: {formatAmount(campaign.reward_rate)} per unit</li>
           {Object.entries(campaign.requirements_json ?? {}).map(([key, value]) => (
             <li key={key}>
               {key}: {String(value)}

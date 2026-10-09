@@ -12,5 +12,6 @@ urlpatterns = [
     path("posts/", views.my_posts, name="my-posts"),
     path("rewards/", views.my_rewards, name="my-rewards"),
     path("claims/", views.my_claims, name="my-claims"),
+    path("campaigns/", views.my_campaigns, name="my-campaigns"),
     path("dashboard/", views.dashboard, name="dashboard"),
 ]

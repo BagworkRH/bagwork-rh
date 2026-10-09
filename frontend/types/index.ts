@@ -123,6 +123,28 @@ export interface Campaign {
 }
 
 /**
+ * A campaign the seller has joined, from `/api/v1/me/campaigns/`.
+ *
+ * Pairs the campaign with the seller's own participation: which campaign it is,
+ * and what they have earned from it so far — the two halves of the question the
+ * public campaign list cannot answer, because it does not know who is asking.
+ */
+export interface JoinedCampaign {
+  campaign_id: number;
+  slug: string;
+  name: string;
+  campaign_status: CampaignStatus;
+  token_symbol: string;
+  reward_model: RewardModel;
+  reward_rate: string;
+  remaining_budget: string;
+  end_at: string;
+  participation_status: "ACTIVE" | "LEFT" | "EXCLUDED";
+  joined_at: string;
+  cumulative_reward: string;
+}
+
+/**
  * Create/update payload for a campaign, mirroring the backend's
  * `CampaignWriteSerializer`. Only staff and brand accounts may send it; a brand
  * that sends it is recorded as the campaign's funder by the backend, so the

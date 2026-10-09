@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClaimFlow } from "@/hooks/useClaimFlow";
 import { useWallet } from "@/hooks/useWallet";
 import { shortenAddress } from "@/lib/constants";
+import { formatAmount } from "@/lib/money";
 import { listClaims, listRewards, listWallets } from "@/services/wallet";
 import type { Claim, Reward, Wallet } from "@/types";
 
@@ -95,7 +96,7 @@ export default function WalletPage() {
                 available.map((r) => (
                   <div className="row" key={r.id}>
                     <span>
-                      {r.amount} {r.token_symbol}
+                      {formatAmount(r.amount)} {r.token_symbol}
                     </span>
                     <button
                       className="btn btn-primary btn-sm"
@@ -126,7 +127,7 @@ export default function WalletPage() {
                 <ul>
                   {claims.map((c) => (
                     <li key={c.id}>
-                      {c.amount} {c.token_symbol} — {c.status}
+                      {formatAmount(c.amount)} {c.token_symbol} — {c.status}
                       {c.transaction_hash ? (
                         <>
                           {" "}

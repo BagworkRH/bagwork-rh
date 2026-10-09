@@ -1,6 +1,6 @@
 /** Campaign services (Spec 02). */
 import { apiRequest } from "@/lib/api";
-import type { Campaign, CampaignCreateInput } from "@/types";
+import type { Campaign, CampaignCreateInput, JoinedCampaign } from "@/types";
 
 export async function listCampaigns(): Promise<Campaign[]> {
   return apiRequest<Campaign[]>("/api/v1/campaigns/");
@@ -46,4 +46,14 @@ export async function joinCampaign(campaignId: number): Promise<unknown> {
     method: "POST",
     auth: true,
   });
+}
+
+/**
+ * The campaigns this seller has joined, newest first.
+ *
+ * Distinct from `listCampaigns`: that answers "what exists", this answers "what
+ * am I in and what have I earned from it", which is the seller's own view.
+ */
+export async function getMyCampaigns(): Promise<JoinedCampaign[]> {
+  return apiRequest<JoinedCampaign[]>("/api/v1/me/campaigns/", { auth: true });
 }

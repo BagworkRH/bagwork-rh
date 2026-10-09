@@ -1,4 +1,4 @@
-import CampaignCard from "@/components/CampaignCard";
+import CampaignGrid from "@/components/CampaignGrid";
 import { apiRequest } from "@/lib/api";
 import type { Campaign } from "@/types";
 
@@ -30,11 +30,7 @@ export default async function CampaignsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid">
-          {campaigns.map((campaign) => (
-            <CampaignCard key={campaign.id} campaign={campaign} />
-          ))}
-        </div>
+        <CampaignGrid campaigns={campaigns} />
       )}
     </div>
   );
