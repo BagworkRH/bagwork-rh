@@ -13,7 +13,7 @@ import {
 } from "@/services/social";
 import type { SellerProfile, SocialAccount, SocialPlatform } from "@/types";
 
-type Step = "account" | "x" | "wallet" | "code" | "done";
+type Step = "account" | "x" | "code" | "done";
 
 /**
  * A connectable platform as the backend advertises it (`/x/platforms/`): the id
@@ -317,18 +317,6 @@ export default function OnboardPage() {
                     );
                   })}
 
-                  {/* A forward link only while there is somewhere to go: once the
-                      wallet is linked this step is behind the seller, and the
-                      button would point back at a step they have finished. */}
-                  {connection.status !== "connected" && (
-                    <button
-                      className="btn btn-primary"
-                      style={{ marginTop: 12 }}
-                      onClick={() => setStep("wallet")}
-                    >
-                      Continue to wallet
-                    </button>
-                  )}
                 </>
               ) : (
                 <p className="muted">Create an account first.</p>
