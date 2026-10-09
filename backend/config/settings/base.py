@@ -258,6 +258,12 @@ TIKTOK_CLIENT_KEY = os.environ.get("TIKTOK_CLIENT_KEY", "")
 TIKTOK_CLIENT_SECRET = os.environ.get("TIKTOK_CLIENT_SECRET", "")
 TIKTOK_REDIRECT_URI = os.environ.get("TIKTOK_REDIRECT_URI", "")
 
+# Key used to encrypt stored OAuth credentials at rest (Spec 02/03). Prefer a
+# dedicated value so rotating SECRET_KEY does not render every stored token
+# undecryptable; falls back to SECRET_KEY when unset. Rotate it with
+# `manage.py rotate_social_credentials` (see docs/06).
+SOCIAL_ENCRYPTION_KEY = os.environ.get("SOCIAL_ENCRYPTION_KEY", "")
+
 # Blockchain (Spec 04)
 # RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and
 # claim/listener/reconciliation tasks report "disabled" instead of failing.

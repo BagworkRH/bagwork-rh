@@ -270,7 +270,9 @@ and connect is a real OAuth flow.
 - [x] Provider metrics — each provider call logs
       `provider`/`operation`/`outcome`/`latency_ms` (`apps/social/providers/metrics.py`);
       the failure-rate/latency dashboard and its alert are built on the log pipeline
-- [ ] Secret rotation for stored OAuth tokens
+- [x] Secret rotation for stored OAuth tokens — `SOCIAL_ENCRYPTION_KEY`
+      (decoupled from `SECRET_KEY`) + `manage.py rotate_social_credentials`
+      (re-encrypts rows from the old material; `--dry-run` supported)
 - [ ] Backup/restore drill for a live database
 - [ ] Terms of service covering disclosure obligations and reversals
 

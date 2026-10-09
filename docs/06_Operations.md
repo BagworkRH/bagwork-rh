@@ -113,5 +113,16 @@ dedicated tool (k6 / Locust) hitting the full authenticated workflows
    credentials, and the testnet `CLAIM_SIGNER` in the secret manager, update
    `.env`/environment, restart all processes, and confirm
    `manage.py check --deploy` is green.
+
+   Stored OAuth tokens are encrypted with a key derived from
+   `SOCIAL_ENCRYPTION_KEY` (falling back to `SECRET_KEY`). Rotate it by setting
+   the new `SOCIAL_ENCRYPTION_KEY` and re-encrypting existing rows from the old
+   material — otherwise changing `SECRET_KEY` alone silently renders every
+   stored token undecryptable:
+
+   ```bash
+   SOCIAL_ENCRYPTION_KEY=<new> SOCIAL_ENCRYPTION_KEY_OLD=<old> \
+     python manage.py rotate_social_credentials      # add --dry-run to rehearse
+   ```
 5. **Post-incident** — write an audit-log entry (see `apps.audit`) noting what
    happened, who acted, and the resolution.
