@@ -12,6 +12,7 @@ import importlib
 from django.conf import settings
 
 from .base import SocialProviderError
+from .metrics import instrument_provider
 
 
 def provider_mode() -> str:
@@ -48,7 +49,7 @@ def get_provider(platform: str = "x", user=None):
     if provider_mode() == "mock":
         from .mock import MockSocialProvider  # noqa: PLC0415
 
-        return MockSocialProvider(user, platform=platform)
+        return instrument_provider(MockSocialProvider(user, platform=platform))
 
     path = REGISTRY.get(platform)
     if path is None:
@@ -61,4 +62,4 @@ def get_provider(platform: str = "x", user=None):
     # Registry paths are relative to this package, so a leading-dot import is
     # not usable here; resolve against the package name explicitly.
     module = importlib.import_module(f"{__package__}{module_path}")
-    return getattr(module, class_name)(user)
+    return instrument_provider(getattr(module, class_name)(user))

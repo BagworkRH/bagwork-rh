@@ -63,6 +63,11 @@ loudly instead of silently disabling a limit.
   same context with `bind_request_id(...)`, and extra fields go on a record with
   `logger.info("...", extra={"structured": {...}})` — the shape a
   provider-failure dashboard reads.
+- **Provider metrics** — every provider API call is timed and logged with a
+  structured outcome (`provider`, `operation`, `outcome`, `latency_ms`) by
+  `apps/social/providers/metrics.py`, applied in `get_provider`. Chart failure
+  rate and p95 latency per platform from those lines, and alert when a platform
+  stops returning `outcome=ok` — the Phase 8 provider-outage signal.
 
 ## 3. Backups (PostgreSQL)
 

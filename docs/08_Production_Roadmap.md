@@ -267,7 +267,9 @@ and connect is a real OAuth flow.
       on every line and response header; `bind_request_id(...)` for tasks and
       `extra={"structured": {...}}` for entity/provider fields
 - [ ] Error tracking and uptime alerting (Sentry bootstrapped; alerting is external)
-- [ ] Provider-specific dashboards (failure rate, latency)
+- [x] Provider metrics — each provider call logs
+      `provider`/`operation`/`outcome`/`latency_ms` (`apps/social/providers/metrics.py`);
+      the failure-rate/latency dashboard and its alert are built on the log pipeline
 - [ ] Secret rotation for stored OAuth tokens
 - [ ] Backup/restore drill for a live database
 - [ ] Terms of service covering disclosure obligations and reversals
