@@ -205,7 +205,9 @@ export default function OnboardPage() {
         setBusy(false);
         return;
       }
-      await loadDashboard();
+      // The summary is a nicety on the way to "done" - a failure there must not
+      // report a wallet that did connect as a failed step.
+      await loadDashboard().catch(() => undefined);
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wallet step failed.");

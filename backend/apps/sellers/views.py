@@ -1,5 +1,7 @@
 """Views for the authenticated user's own data under /me/."""
-from django.db.models import Sum
+from decimal import Decimal
+
+from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -20,6 +22,13 @@ from apps.wallets.services import (
 
 from .models import SellerProfile
 from .serializers import SellerDashboardSerializer, SellerProfileSerializer
+
+# `Reward.amount` is a Decimal, so `Sum("amount")` is a Decimal; pairing it with
+# the integer literal 0 makes Django's Coalesce raise FieldError ("Expression
+# contains mixed types: DecimalField, IntegerField. You must set output_field").
+# Tie the fallback to the field's own shape instead — which is exactly the shape
+# `SellerDashboardSerializer` serialises the totals back out as.
+DECIMAL_ZERO = Value(Decimal("0"), output_field=DecimalField(max_digits=40, decimal_places=18))
 
 
 @api_view(["GET"])
@@ -236,9 +245,9 @@ def dashboard(request):
 
     rewards = Reward.objects.filter(seller=profile)
 
-    total_earnings = rewards.aggregate(total=Coalesce(Sum("amount"), 0))["total"]
+    total_earnings = rewards.aggregate(total=Coalesce(Sum("amount"), DECIMAL_ZERO))["total"]
     available = rewards.filter(status=RewardStatus.AVAILABLE).aggregate(
-        total=Coalesce(Sum("amount"), 0)
+        total=Coalesce(Sum("amount"), DECIMAL_ZERO)
     )["total"]
     pending_count = rewards.filter(status=RewardStatus.PENDING).count()
 
