@@ -266,7 +266,9 @@ and connect is a real OAuth flow.
       `JsonFormatter` (`config/observability.py`): `LOG_FORMAT=json`, request id
       on every line and response header; `bind_request_id(...)` for tasks and
       `extra={"structured": {...}}` for entity/provider fields
-- [ ] Error tracking and uptime alerting (Sentry bootstrapped; alerting is external)
+- [x] Error tracking (Sentry, bootstrapped) and alerting rules (health probe,
+      heartbeat, provider error-rate/latency, Sentry spikes) — the monitor and
+      page channel themselves are external config (rules in `docs/06`)
 - [x] Provider metrics — each provider call logs
       `provider`/`operation`/`outcome`/`latency_ms` (`apps/social/providers/metrics.py`);
       the failure-rate/latency dashboard and its alert are built on the log pipeline

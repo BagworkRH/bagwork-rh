@@ -69,6 +69,23 @@ loudly instead of silently disabling a limit.
   rate and p95 latency per platform from those lines, and alert when a platform
   stops returning `outcome=ok` — the Phase 8 provider-outage signal.
 
+### Alerting
+
+Wire these to the on-call channel (pager/Slack). They are what turns a provider
+outage — or a dead worker — into a page:
+
+| Signal | Condition | Severity |
+| --- | --- | --- |
+| Health probe | `GET /api/health/` non-200, or `checks.heartbeat == "stale"` | page |
+| Worker / beat dead | `checks.heartbeat == "unset"` for longer than one interval | page |
+| Provider outage | `structured.outcome == "error"` rate for a platform above a small floor over ~5 min | page |
+| Provider latency | p95 `structured.latency_ms` for a platform above its budget | ticket |
+| Error spikes | Sentry: new / unhandled exception rate above a small floor | page |
+
+Sentry covers the last row; the rest read the health endpoint and the structured
+provider-metric lines. Keep thresholds beside the alert configuration, not in
+code.
+
 ## 3. Backups (PostgreSQL)
 
 ```bash
