@@ -235,6 +235,23 @@ development campaigns still launch. Brands may create and launch their own
 campaigns; the funding gate, not a staff-only permission, is what stops an
 unfunded one going live.
 
+### Rehearsing the funding rail
+
+The brand sends the stablecoin itself; the platform only verifies the receipt.
+A deposit is recorded PENDING and credited only once `verify_deposit` reads a
+matching transfer to the treasury. On testnet both steps are scripted:
+
+```bash
+# 1. the brand's transfer (its own key -> FUNDING_TREASURY_ADDRESS)
+cd contracts/src/reward_token
+USDG_FROM_KEY=... USDG_TO=<treasury> USDG_AMOUNT=5 npm run send:usdg:testnet
+
+# 2. record + confirm the deposit, then launch a campaign the balance covers
+cd backend
+python manage.py prepare_funding --company "Acme" --amount 5 \
+    --tx-hash 0x... --slug acme-launch --launch
+```
+
 ### Registering the payout token
 
 ```bash

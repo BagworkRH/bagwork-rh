@@ -13,7 +13,9 @@
     "fund:escrow:testnet": "hardhat run scripts/fund-escrow.ts --network robinhoodTestnet",
     "fund:escrow:local": "hardhat run scripts/fund-escrow.ts",
     "submit:claim:testnet": "hardhat run scripts/submit-claim.ts --network robinhoodTestnet",
-    "submit:claim:local": "hardhat run scripts/submit-claim.ts"
+    "submit:claim:local": "hardhat run scripts/submit-claim.ts",
+    "send:usdg:testnet": "hardhat run scripts/send-usdg.ts --network robinhoodTestnet",
+    "send:usdg:local": "hardhat run scripts/send-usdg.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.7",
