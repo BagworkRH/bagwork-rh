@@ -246,19 +246,18 @@ rehearsal.
 
 **Done when:** a claim settles on a public explorer. — **met.**
 
-## Stage 7 — Frontend parity
+## Stage 7 — Frontend parity  — DONE (X)
 
-No campaign-create UI. The onboarding page still hardcodes "X account:
-Connected (mock)" — now wrong twice over, since the platform is configurable
-and connect is a real OAuth flow.
+- [x] Platform picker using `/x/platforms/` — renders the backend's platform
+      name, not a hardcoded X/TikTok label
+- [x] Real connect/disconnect UI for every offered platform
+- [x] Campaign create screen (`/brand/create`, brand + staff)
+- [x] Post status and rejection reasons surfaced to creators
+- [x] X-only copy removed (home, metadata, `how-it-works`, and the dead X
+      connect/disconnect helpers)
 
-- [ ] Platform picker using `/x/platforms/`
-- [ ] Real connect/disconnect UI, both platforms
-- [ ] Campaign create screen (Stage 4)
-- [ ] Post status and rejection reasons surfaced to creators
-- [ ] Remove remaining X-only copy in `how-it-works` / `onboard`
-
-**Done when:** a creator can do everything without a developer present.
+**Done when:** a creator can do everything without a developer present. — met on
+X; TikTok parity follows its credentials (Stage 2).
 
 ## Stage 8 — Operations
 

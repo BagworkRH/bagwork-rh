@@ -16,6 +16,14 @@ import type { SellerProfile, SocialAccount, SocialPlatform } from "@/types";
 type Step = "account" | "x" | "wallet" | "code" | "done";
 
 /**
+ * A connectable platform as the backend advertises it (`/x/platforms/`): the id
+ * to call connect/disconnect with, and the display name to show. Rendering the
+ * backend's name rather than a hardcoded label keeps the UI honest when a
+ * platform is added or renamed.
+ */
+type PlatformChoice = { id: SocialPlatform; name: string };
+
+/**
  * Seller onboarding flow (Spec 01):
  * 1. Social accounts  2. Wallet  3. Seller profile/code  4. Confirmation
  */
@@ -29,7 +37,7 @@ export default function OnboardPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sellerCode, setSellerCode] = useState<string>("");
-  const [available, setAvailable] = useState<SocialPlatform[]>([]);
+  const [available, setAvailable] = useState<PlatformChoice[]>([]);
   const [linked, setLinked] = useState<SocialAccount[]>([]);
   const [platformBusy, setPlatformBusy] = useState<SocialPlatform | null>(null);
   const [platformError, setPlatformError] = useState<string | null>(null);
@@ -42,7 +50,7 @@ export default function OnboardPage() {
   const loadPlatforms = useCallback(async () => {
     try {
       const res = await getPlatforms();
-      setAvailable(res.platforms.map((p) => p.id));
+      setAvailable(res.platforms);
     } catch {
       setAvailable([]);
     }
@@ -198,14 +206,12 @@ export default function OnboardPage() {
                   )}
 
                   {available.map((platform) => {
-                    const account = linked.find((a) => a.platform === platform);
-                    const busy = platformBusy === platform;
+                    const account = linked.find((a) => a.platform === platform.id);
+                    const busy = platformBusy === platform.id;
                     return (
-                      <div className="row" key={platform}>
+                      <div className="row" key={platform.id}>
                         <div>
-                          <strong>
-                            {platform === "x" ? "X (Twitter)" : "TikTok"}
-                          </strong>
+                          <strong>{platform.name}</strong>
                           {account ? (
                             <>
                               {" "}
@@ -220,7 +226,7 @@ export default function OnboardPage() {
                           <button
                             className="btn btn-outline btn-sm"
                             disabled={busy}
-                            onClick={() => void handleDisconnect(platform)}
+                            onClick={() => void handleDisconnect(platform.id)}
                           >
                             {busy ? "Disconnecting…" : "Disconnect"}
                           </button>
@@ -228,7 +234,7 @@ export default function OnboardPage() {
                           <button
                             className="btn btn-primary btn-sm"
                             disabled={busy}
-                            onClick={() => void handleConnect(platform)}
+                            onClick={() => void handleConnect(platform.id)}
                           >
                             {busy ? "Redirecting…" : "Connect"}
                           </button>

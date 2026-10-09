@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 export const metadata: Metadata = {
   title: "bagworkRH — Get paid for the posts you make",
   description:
-    "Post for a campaign, earn verified token rewards, claim on-chain. Connect your X account and wallet to get paid.",
+    "Post for a campaign, earn verified token rewards, claim on-chain. Connect your social accounts and wallet to get paid.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

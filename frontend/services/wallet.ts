@@ -82,21 +82,6 @@ export async function getClaim(claimId: number): Promise<Claim> {
   return apiRequest<Claim>(`/api/v1/claims/${claimId}/`, { auth: true });
 }
 
-export interface XConnectResult {
-  authorize_url: string;
-  mock: boolean;
-}
-
-/** Start the X (Twitter) OAuth authorization flow. */
-export async function startXConnect(): Promise<XConnectResult> {
-  // The platform segment appears twice: social routes are mounted under
-  // /api/v1/x/ for every platform, so X's connect path is /x/x/connect/.
-  return apiRequest<XConnectResult>("/api/v1/x/x/connect/", {
-    method: "POST",
-    auth: true,
-  });
-}
-
-export async function disconnectX(): Promise<void> {
-  return apiRequest<void>("/api/v1/x/x/disconnect/", { method: "POST", auth: true });
-}
+// X connect/disconnect moved to `services/social.ts`, which is platform-agnostic
+// (`connectPlatform` / `disconnectPlatform`). The X-only helpers that used to
+// live here went dead once onboarding handled every platform.

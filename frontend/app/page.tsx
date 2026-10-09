@@ -87,9 +87,9 @@ export default async function HomePage() {
       <section className="hero container">
         <h1>Post for a campaign. Get paid on-chain.</h1>
         <p>
-          Connect your X account and wallet, publish qualifying posts, and
-          earn verified token rewards. Every claim is EIP-712 signed and settled
-          on Robinhood Chain.
+          Connect your social accounts and wallet, publish qualifying posts,
+          and earn verified token rewards. Every claim is EIP-712 signed and
+          settled on Robinhood Chain.
         </p>
         <div className="hero-ctas">
           <Link href="/dashboard" className="btn btn-primary">
@@ -150,8 +150,8 @@ export default async function HomePage() {
           <div className="card">
             <h3>One seller code</h3>
             <p className="muted">
-              A unique, secure code links your X activity to your campaigns
-              without exposing extra data.
+              A unique, secure code links your social activity to your
+              campaigns without exposing extra data.
             </p>
           </div>
         </div>
