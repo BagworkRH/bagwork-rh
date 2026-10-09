@@ -26,7 +26,7 @@ class _FakeProvider:
     def discover_posts(self, *args, **kwargs):
         raise SocialProviderError("boom")
 
-    def authorize(self, request, scopes):
+    def authorize(self, request, scopes, *, state=None, code_verifier=None):
         return "https://example.test/authorize"
 
 
@@ -65,7 +65,7 @@ class InstrumentProviderTests(TestCase):
         provider = instrument_provider(_FakeProvider())
         handler = self._capture()
 
-        provider.authorize(None, [])
+        provider.authorize(None, [], state="s", code_verifier="v")
 
         self.assertEqual(handler.records, [])
 

@@ -23,17 +23,24 @@ class SocialProvider(ABC):
     platform = ""
 
     @abstractmethod
-    def authorize(self, request, scopes):
-        """Build the OAuth authorization URL.
+    def authorize(self, request, scopes, *, state, code_verifier):
+        """Build the OAuth authorization URL for caller-supplied PKCE material.
 
-        Any state/PKCE material must be namespaced by platform so one
-        platform's callback cannot complete another's authorization.
+        `state` and `code_verifier` are generated *and persisted* by the caller
+        (the connect endpoint), not by the adapter. The return leg is a top-level
+        browser navigation that cannot carry the caller's bearer token, so the
+        correlation handle has to live somewhere the callback can read without a
+        session — and that is the caller's job, not the adapter's.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def callback(self, request, state, code):
-        """Handle the OAuth callback; exchange code; return identity."""
+    def callback(self, request, state, code, *, code_verifier=None):
+        """Handle the OAuth callback; exchange code; return identity.
+
+        The caller has already resolved `state` to a user and passes the matching
+        `code_verifier`; adapters whose flow has no PKCE (e.g. TikTok) ignore it.
+        """
         raise NotImplementedError
 
     @abstractmethod

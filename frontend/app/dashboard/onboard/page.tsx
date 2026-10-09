@@ -41,6 +41,12 @@ export default function OnboardPage() {
   const [linked, setLinked] = useState<SocialAccount[]>([]);
   const [platformBusy, setPlatformBusy] = useState<SocialPlatform | null>(null);
   const [platformError, setPlatformError] = useState<string | null>(null);
+  /**
+   * Outcome of an OAuth round-trip. The backend redirects back to this page with
+   * `?connected=` or `?error=`, so the seller sees what happened instead of a
+   * silent reload after handing off to the provider.
+   */
+  const [oauthNotice, setOauthNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   /**
    * Which platforms this build can connect, and which ones this seller has
@@ -66,6 +72,18 @@ export default function OnboardPage() {
   useEffect(() => {
     void loadPlatforms();
   }, [loadPlatforms]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("connected");
+    const oauthError = params.get("error");
+    if (connected) {
+      setOauthNotice({ ok: true, text: `${connected.toUpperCase()} connected.` });
+    } else if (oauthError) {
+      setOauthNotice({ ok: false, text: `Could not connect: ${oauthError}` });
+    }
+  }, []);
 
   /**
    * Begin OAuth for one platform.
@@ -194,6 +212,12 @@ export default function OnboardPage() {
                     Link the platforms you publish on. We use only the read
                     permissions we need, and we never post on your behalf.
                   </p>
+
+                  {oauthNotice && (
+                    <div className={`banner ${oauthNotice.ok ? "banner-ok" : "banner-error"}`}>
+                      {oauthNotice.text}
+                    </div>
+                  )}
 
                   {platformError && (
                     <div className="banner banner-error">{platformError}</div>

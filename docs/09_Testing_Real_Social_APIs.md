@@ -57,8 +57,16 @@ app itself:
 ```bash
 python manage.py runserver
 # as a seller: POST /api/v1/x/x/connect/  -> follow authorize_url
-# then:         GET  /api/v1/x/x/callback/?state=...&code=...
 ```
+
+`connect` records a pending `SocialOAuthState` (the `state`, the PKCE verifier
+and the user), and the callback resolves the user from `state` alone before
+redirecting the browser back to the app. The callback is deliberately public:
+the provider's redirect is a top-level browser navigation, so it carries neither
+the SPA's bearer token (which lives in `localStorage`) nor a session cookie — a
+token-based SPA has no session to lean on. Trust comes from `state`, which is
+unguessable, single-use, and expires after `SOCIAL_OAUTH_STATE_TTL_SECONDS`
+(default 600 seconds).
 
 **f. Verify against the real API:**
 ```bash

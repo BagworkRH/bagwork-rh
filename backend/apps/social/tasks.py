@@ -265,3 +265,22 @@ def flag_suspicious_activity(hours: int = 24):
     from apps.audit import risk  # noqa: PLC0415
 
     return risk.scan_recent_posts(hours)
+
+
+@shared_task
+def purge_social_oauth_states(older_than_hours: int = 24):
+    """Delete social OAuth state rows that can no longer be redeemed.
+
+    Every connect attempt writes one row and most are never redeemed — a user
+    who opens the consent screen and backs out leaves the row behind — so
+    without this the table grows with traffic forever. A row that expired more
+    than `older_than_hours` ago is dead weight by definition, since the callback
+    refuses anything past `expires_at`.
+    """
+    from datetime import timedelta  # noqa: PLC0415
+
+    from .models import SocialOAuthState  # noqa: PLC0415
+
+    cutoff = timezone.now() - timedelta(hours=older_than_hours)
+    deleted, _ = SocialOAuthState.objects.filter(expires_at__lt=cutoff).delete()
+    return {"status": "ok", "deleted": deleted}

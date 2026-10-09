@@ -232,6 +232,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.social.tasks.flag_suspicious_activity",
         "schedule": timedelta(hours=1),
     },
+    # Purge OAuth state rows the callback can no longer redeem, so an abandoned
+    # connect attempt does not accumulate in the table forever.
+    "purge-social-oauth-states": {
+        "task": "apps.social.tasks.purge_social_oauth_states",
+        "schedule": timedelta(hours=6),
+    },
     # Phase 8: worker/beat liveness heartbeat written every minute.
     "monitoring-heartbeat": {
         "task": "apps.monitoring.tasks.heartbeat",
@@ -263,6 +269,11 @@ TIKTOK_REDIRECT_URI = os.environ.get("TIKTOK_REDIRECT_URI", "")
 # undecryptable; falls back to SECRET_KEY when unset. Rotate it with
 # `manage.py rotate_social_credentials` (see docs/06).
 SOCIAL_ENCRYPTION_KEY = os.environ.get("SOCIAL_ENCRYPTION_KEY", "")
+
+# How long a pending social OAuth `state` stays redeemable between `connect` and
+# `callback`. Bounds the window in which a leaked state could be replayed; long
+# enough to cover a provider login and consent screen.
+SOCIAL_OAUTH_STATE_TTL_SECONDS = int(os.environ.get("SOCIAL_OAUTH_STATE_TTL_SECONDS", "600"))
 
 # Blockchain (Spec 04)
 # RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and

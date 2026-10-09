@@ -31,15 +31,18 @@ class MockSocialProvider(SocialProvider):
         # Distinct per platform so mock ids do not collide across platforms.
         return self.platform
 
-    def authorize(self, request, scopes):
+    def authorize(self, request, scopes, *, state=None, code_verifier=None):
         from django.urls import reverse  # noqa: PLC0415
 
+        # Echo the *issued* state so the mock round-trips through the very same
+        # callback the live adapters use; a hard-coded state would test a path
+        # no real provider ever takes.
         return request.build_absolute_uri(
             reverse("social:callback", kwargs={"platform": self.platform})
-            + "?state=mock-state&code=mock-code"
+            + f"?state={state}&code=mock-code"
         )
 
-    def callback(self, request, state, code):
+    def callback(self, request, state, code, *, code_verifier=None):
         return {
             "provider_user_id": f"mock-{self._suffix()}-{self._user.id}",
             "username": self._user.username or "mockuser",

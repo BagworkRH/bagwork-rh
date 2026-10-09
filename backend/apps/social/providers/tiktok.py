@@ -13,16 +13,12 @@ automation policy.
 Metrics are reported only when TikTok actually exposes them; a metric that is
 not available is omitted rather than reported as a fabricated zero.
 """
-import secrets
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import requests
 
 from .base import SocialProvider, SocialProviderError
-
-# Session keys are namespaced by platform, matching the X adapter.
-SESSION_PREFIX = "social_oauth"
 
 AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/"
 TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
@@ -63,9 +59,6 @@ class OfficialTikTokProvider(SocialProvider):
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
 
-    def _session_key(self, suffix: str) -> str:
-        return f"{SESSION_PREFIX}:{self.platform}:{suffix}"
-
     def _credentials(self):
         from django.conf import settings  # noqa: PLC0415
 
@@ -76,17 +69,13 @@ class OfficialTikTokProvider(SocialProvider):
             raise SocialProviderError("TikTok API credentials are not configured.")
         return client_key, client_secret, redirect_uri
 
-    def authorize(self, request, scopes):
+    def authorize(self, request, scopes, *, state, code_verifier=None):
         from django.urls import reverse  # noqa: PLC0415
 
         client_key, _, _ = self._credentials()
 
-        state = secrets.token_urlsafe(32)
-        # TikTok's OAuth flow has no PKCE, but the state still round-trips and
-        # is namespaced so a TikTok callback cannot consume an X session.
-        request.session[self._session_key("state")] = state
-        request.session[self._session_key("scopes")] = scopes
-
+        # TikTok's flow has no PKCE, so `code_verifier` is ignored; `state` is
+        # generated and persisted by the caller, exactly as for X.
         callback_url = request.build_absolute_uri(
             reverse("social:callback", kwargs={"platform": self.platform})
         )
@@ -99,11 +88,8 @@ class OfficialTikTokProvider(SocialProvider):
         }
         return AUTHORIZE_URL + "?" + urlencode(params)
 
-    def callback(self, request, state, code):
+    def callback(self, request, state, code, *, code_verifier=None):
         client_key, client_secret, _ = self._credentials()
-        session_state = request.session.get(self._session_key("state"))
-        if not session_state or session_state != state:
-            raise SocialProviderError("OAuth state mismatch.")
 
         from django.urls import reverse  # noqa: PLC0415
 

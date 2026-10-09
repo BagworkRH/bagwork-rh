@@ -6,7 +6,6 @@ with PKCE flow. Credentials always come from environment variables
 """
 import base64
 import hashlib
-import secrets
 from datetime import timezone as dt_timezone
 from urllib.parse import urlencode
 
@@ -14,10 +13,6 @@ import requests
 from django.utils import timezone
 
 from .base import SocialProvider, SocialProviderError
-
-# Session keys are namespaced by platform so an X callback can never consume a
-# different platform's PKCE verifier or OAuth state.
-SESSION_PREFIX = "social_oauth"
 
 # X's `referenced_tweets[].type` values, confirmed against the live API.
 # `retweeted` is the one that matters: the original code tested for "reposted",
@@ -67,9 +62,6 @@ class OfficialXProvider(SocialProvider):
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
 
-    def _session_key(self, suffix: str) -> str:
-        return f"{SESSION_PREFIX}:{self.platform}:{suffix}"
-
     def _credentials(self):
         from django.conf import settings  # noqa: PLC0415
 
@@ -80,19 +72,12 @@ class OfficialXProvider(SocialProvider):
             raise SocialProviderError("X API credentials are not configured.")
         return client_id, client_secret, redirect_uri
 
-    def authorize(self, request, scopes):
+    def authorize(self, request, scopes, *, state, code_verifier):
         from django.urls import reverse  # noqa: PLC0415
 
         client_id, _, _ = self._credentials()
 
-        state = secrets.token_urlsafe(32)
-        code_verifier = secrets.token_urlsafe(48)
         challenge = _pkce_challenge(code_verifier)
-
-        # Store the verifier + state on the session for the callback step.
-        request.session[self._session_key("state")] = state
-        request.session[self._session_key("verifier")] = code_verifier
-        request.session[self._session_key("scopes")] = scopes
 
         callback_url = request.build_absolute_uri(
             reverse("social:callback", kwargs={"platform": self.platform})
@@ -108,13 +93,8 @@ class OfficialXProvider(SocialProvider):
         }
         return "https://twitter.com/i/oauth2/authorize?" + urlencode(params)
 
-    def callback(self, request, state, code):
+    def callback(self, request, state, code, *, code_verifier=None):
         client_id, client_secret, _ = self._credentials()
-        session_state = request.session.get(self._session_key("state"))
-        if not session_state or session_state != state:
-            raise SocialProviderError("OAuth state mismatch.")
-
-        code_verifier = request.session.get(self._session_key("verifier"))
         if not code_verifier:
             raise SocialProviderError("Missing PKCE verifier.")
 

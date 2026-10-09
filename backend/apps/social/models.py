@@ -8,6 +8,7 @@ the natural key rather than the id alone.
 
 OAuth credentials are stored encrypted at rest; raw tokens are never logged.
 """
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -65,6 +66,57 @@ class SocialAccount(models.Model):
 
     def __str__(self):
         return f"@{self.username} on {self.get_platform_display()} ({self.provider_user_id})"
+
+
+class SocialOAuthState(models.Model):
+    """A pending OAuth authorization, keyed by its `state` parameter.
+
+    The return leg of a provider redirect is a top-level browser navigation, so
+    the callback cannot present the bearer token a token-authenticated SPA keeps
+    in `localStorage` — and it must not depend on a session cookie the SPA never
+    stores. Instead the authenticated `connect` call records everything the
+    callback needs here, and the callback resolves the user from `state`: an
+    unguessable handle that the network must echo back unchanged.
+
+    Rows are single-use (`consumed_at`) and short-lived (`expires_at`), so a
+    leaked or replayed state is worthless.
+    """
+
+    state = models.CharField(max_length=128, unique=True)
+    platform = models.CharField(max_length=16, choices=SocialPlatform.choices)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="social_oauth_states",
+    )
+    # PKCE verifier; blank for providers whose flow has no PKCE (e.g. TikTok).
+    code_verifier = models.CharField(max_length=128, blank=True, default="")
+    scopes = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.platform} oauth state for user {self.user_id}"
+
+    def is_expired(self) -> bool:
+        return self.expires_at <= timezone.now()
+
+    def is_usable(self) -> bool:
+        """Unused and unexpired: the two conditions a callback must meet."""
+        return self.consumed_at is None and not self.is_expired()
+
+    def consume(self) -> None:
+        """Mark single-use.
+
+        Called before any network work, so a replayed callback cannot reuse the
+        handle even if the code exchange itself fails.
+        """
+        self.consumed_at = timezone.now()
+        self.save(update_fields=["consumed_at"])
 
 
 class PostVerificationStatus(models.TextChoices):
