@@ -2,7 +2,10 @@
 # PostgreSQL backup for bagworkRH — Spec 05 Phase 8 (backups).
 #
 # Usage:
-#   ./scripts/backup_db.sh [output_dir]      # default: backend/backups
+#   ./scripts/backup_db.sh [--check] [output_dir]   # default: backend/backups
+#
+#   --check   after dumping, validate the archive with `pg_restore --list`
+#             (cheap integrity check; the full drill is scripts/verify_restore.sh)
 #
 # Reads the same env vars as Django (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST,
 # DB_PORT) from `.env` when present. Output is a pg_dump custom-format archive
@@ -25,7 +28,17 @@ DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-OUT_DIR="${1:-${PROJECT_DIR}/backups}"
+CHECK=false
+OUT_DIR=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK=true ;;
+    -*) echo "error: unknown flag $1" >&2; exit 2 ;;
+    *) OUT_DIR="$1" ;;
+  esac
+  shift
+done
+OUT_DIR="${OUT_DIR:-${PROJECT_DIR}/backups}"
 
 if [ "${DB_ENGINE:-django.db.backends.postgresql}" != "django.db.backends.postgresql" ]; then
   echo "error: DB_ENGINE is not PostgreSQL; backup script is Postgres-only." >&2
@@ -48,4 +61,11 @@ pg_dump \
   --file "${OUT_FILE}"
 
 echo "Backup complete: ${OUT_FILE}"
+
+if [ "${CHECK}" = true ]; then
+  pg_restore --list "${OUT_FILE}" >/dev/null
+  echo "Archive verified readable (pg_restore --list)."
+  echo "For a full restore drill: scripts/verify_restore.sh ${OUT_FILE}"
+fi
+
 echo "Keep a copy off-machine (managed Postgres usually already snapshots)."

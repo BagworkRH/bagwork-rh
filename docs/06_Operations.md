@@ -90,16 +90,23 @@ code.
 
 ```bash
 cd backend
-./scripts/backup_db.sh                      # -> backups/bagwork_rh_*.dump
-./scripts/restore_db.sh backups/bagwork_rh_20260701_120000.dump
+./scripts/backup_db.sh --check                # dump + verify the archive is readable
+./scripts/restore_db.sh backups/bagwork_rh_20260701_120000.dump     # restore in place
+./scripts/verify_restore.sh backups/bagwork_rh_20260701_120000.dump # the drill
 ```
 
 - Custom-format dumps (`pg_dump --format=custom`) support selective restore.
 - Managed Postgres (e.g. RDS/Supabase) usually snapshots automatically; the
-  script is for self-hosted installs and for producing portable archives.
-- **Tested restores** are part of the definition of done: restore into a
-  staging DB after every schema release and spot-check seller/campaign/reward
-  totals.
+  scripts are for self-hosted installs and for producing portable archives.
+- **Tested restores are the definition of done.** `verify_restore.sh` is the
+  one-command drill: it proves the archive is readable, restores it into a
+  throwaway database (never the live one), compares row counts for the tables
+  that matter, reports, and drops the throwaway. It exits non-zero on any
+  mismatch, so a release pipeline can gate on it. Run it after every schema
+  release.
+- The drill's spot-check tables and the scripts' shell syntax are checked by
+  `tests/test_backup_scripts.py`, so a renamed table fails the suite rather than
+  turning the drill into a false PASS.
 
 ## 4. Load testing
 

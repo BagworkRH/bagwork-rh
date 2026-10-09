@@ -275,7 +275,10 @@ and connect is a real OAuth flow.
 - [x] Secret rotation for stored OAuth tokens — `SOCIAL_ENCRYPTION_KEY`
       (decoupled from `SECRET_KEY`) + `manage.py rotate_social_credentials`
       (re-encrypts rows from the old material; `--dry-run` supported)
-- [ ] Backup/restore drill for a live database
+- [x] Backup/restore drill — `scripts/verify_restore.sh` performs it in one
+      command (throwaway DB, row-count comparison, non-zero on drift);
+      `backup_db.sh --check` verifies the archive; `tests/test_backup_scripts.py`
+      guards the scripts and their spot-check tables
 - [ ] Terms of service covering disclosure obligations and reversals
 
 **Done when:** a provider outage pages someone and the runbook is unambiguous.
