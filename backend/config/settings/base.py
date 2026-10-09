@@ -63,6 +63,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Outermost: assigns/binds the request id before anything else runs, so
+    # every log line for a request is correlatable (Spec 05 Phase 8).
+    "config.observability.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -315,24 +318,34 @@ PLATFORM_FEE_BPS = int(os.environ.get("PLATFORM_FEE_BPS", "1500"))
 # threshold are queued for human review; nothing is ever actioned automatically.
 RISK_REVIEW_THRESHOLD = int(os.environ.get("RISK_REVIEW_THRESHOLD", "30"))
 
+# Structured logging (Spec 05 Phase 8). `LOG_FORMAT=json` emits one JSON object
+# per line for a log pipeline; the default text formatter stays readable in
+# development. Every line carries the request id bound by RequestIDMiddleware.
+LOG_FORMAT = os.environ.get("LOG_FORMAT", "text").strip().lower()
+
 # Logging
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "config.observability.RequestIDFilter"},
+    },
     "formatters": {
         "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "format": "{levelname} {asctime} {module} [req:{request_id}] {process:d} {thread:d} {message}",
             "style": "{",
         },
         "simple": {
-            "format": "{levelname} {message}",
+            "format": "{levelname} [req:{request_id}] {message}",
             "style": "{",
         },
+        "json": {"()": "config.observability.JsonFormatter"},
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "simple",
+            "formatter": "json" if LOG_FORMAT == "json" else "simple",
+            "filters": ["request_id"],
         },
     },
     "root": {

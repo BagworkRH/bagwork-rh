@@ -262,8 +262,11 @@ and connect is a real OAuth flow.
 
 ## Stage 8 — Operations
 
-- [ ] Structured logging with request/post ids
-- [ ] Error tracking and uptime alerting
+- [x] Structured logging with request ids — `RequestIDMiddleware` +
+      `JsonFormatter` (`config/observability.py`): `LOG_FORMAT=json`, request id
+      on every line and response header; `bind_request_id(...)` for tasks and
+      `extra={"structured": {...}}` for entity/provider fields
+- [ ] Error tracking and uptime alerting (Sentry bootstrapped; alerting is external)
 - [ ] Provider-specific dashboards (failure rate, latency)
 - [ ] Secret rotation for stored OAuth tokens
 - [ ] Backup/restore drill for a live database

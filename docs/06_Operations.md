@@ -54,6 +54,15 @@ loudly instead of silently disabling a limit.
 - **Error tracking** — when `SENTRY_DSN` is set, `config/sentry.py` boots the
   SDK in the web (WSGI/ASGI) and Celery processes. `SENTRY_TRACES_SAMPLE_RATE`
   controls tracing (default 0). PII is never attached (`send_default_pii=False`).
+- **Structured logging & request ids** — every request is assigned an id
+  (reused from an inbound `X-Request-ID`, else generated), echoed in the
+  `X-Request-ID` response header and stamped on every log line, so a client
+  error, its server logs, and its upstream trace share one id
+  (`config/observability.py`). Set `LOG_FORMAT=json` to emit one JSON object per
+  line for a log pipeline; the default is readable text. Celery tasks bind the
+  same context with `bind_request_id(...)`, and extra fields go on a record with
+  `logger.info("...", extra={"structured": {...}})` — the shape a
+  provider-failure dashboard reads.
 
 ## 3. Backups (PostgreSQL)
 
