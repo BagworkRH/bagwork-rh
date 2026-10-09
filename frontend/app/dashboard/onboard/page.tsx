@@ -28,7 +28,7 @@ type PlatformChoice = { id: SocialPlatform; name: string };
  * 1. Social accounts  2. Wallet  3. Seller profile/code  4. Confirmation
  */
 export default function OnboardPage() {
-  const { user, register, login, loadDashboard } = useAuth();
+  const { user, loading, register, login, loadDashboard } = useAuth();
   const { connection, connect, error: walletError } = useWallet();
   const [step, setStep] = useState<Step>(user ? "x" : "account");
   const [email, setEmail] = useState("");
@@ -78,12 +78,52 @@ export default function OnboardPage() {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get("connected");
     const oauthError = params.get("error");
-    if (connected) {
-      setOauthNotice({ ok: true, text: `${connected.toUpperCase()} connected.` });
-    } else if (oauthError) {
-      setOauthNotice({ ok: false, text: `Could not connect: ${oauthError}` });
-    }
+    if (!connected && !oauthError) return;
+    setOauthNotice(
+      connected
+        ? { ok: true, text: `${connected.toUpperCase()} connected.` }
+        : { ok: false, text: `Could not connect: ${oauthError}` }
+    );
+    // Drop the query so a refresh does not replay a stale outcome.
+    window.history.replaceState({}, "", window.location.pathname);
   }, []);
+
+  /**
+   * The provider redirect reloads the page, and `useAuth` hydrates the session in
+   * an effect — so on the first render `user` is null and `step` starts at
+   * "account". Left there, a signed-in seller returning from X would see an empty
+   * Step 1 (the signup form is gated on `!user`, the social card on the step) and
+   * no connect banner. Wait for the session check, then lift the step — never
+   * rewind, so a seller already on wallet/code stays put.
+   */
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      setStep("account");
+      return;
+    }
+    setStep((current) => (current === "account" ? "x" : current));
+  }, [user, loading]);
+
+  /**
+   * The same reload resets `sellerCode`, so Step 3 would claim the code appears
+   * "after signup" for a seller who signed up long ago. The profile already
+   * exists, so read it back.
+   */
+  useEffect(() => {
+    if (!user || sellerCode) return;
+    let cancelled = false;
+    apiRequest<SellerProfile>("/api/v1/me/seller/", { auth: true })
+      .then((profile) => {
+        if (!cancelled) setSellerCode(profile.seller_code);
+      })
+      .catch(() => {
+        // Onboarding still works without it; the code is shown once created.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sellerCode]);
 
   /**
    * Begin OAuth for one platform.
@@ -177,6 +217,13 @@ export default function OnboardPage() {
   return (
     <div className="container section" style={{ maxWidth: 680 }}>
       <h1>Onboard a seller</h1>
+
+      {oauthNotice && (
+        <div className={`banner ${oauthNotice.ok ? "banner-ok" : "banner-error"}`}>
+          {oauthNotice.text}
+        </div>
+      )}
+
 <div className="stepper">
         <div className="step">
           <h3>Step 1 — {step === "account" ? "Create account" : "Social accounts"}</h3>
@@ -212,12 +259,6 @@ export default function OnboardPage() {
                     Link the platforms you publish on. We use only the read
                     permissions we need, and we never post on your behalf.
                   </p>
-
-                  {oauthNotice && (
-                    <div className={`banner ${oauthNotice.ok ? "banner-ok" : "banner-error"}`}>
-                      {oauthNotice.text}
-                    </div>
-                  )}
 
                   {platformError && (
                     <div className="banner banner-error">{platformError}</div>
