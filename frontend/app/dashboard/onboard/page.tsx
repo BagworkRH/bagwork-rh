@@ -274,17 +274,24 @@ export default function OnboardPage() {
                     const account = linked.find((a) => a.platform === platform.id);
                     const busy = platformBusy === platform.id;
                     return (
-                      <div className="row" key={platform.id}>
-                        <div>
+                      // Identity on one line, action pushed to the right, so
+                      // "Connected" and the Disconnect button share a baseline
+                      // and stay in column from row to row instead of drifting
+                      // with the width of the handle.
+                      <div
+                        className="row"
+                        key={platform.id}
+                        style={{ justifyContent: "space-between" }}
+                      >
+                        <div className="row" style={{ marginTop: 0 }}>
                           <strong>{platform.name}</strong>
                           {account ? (
                             <>
-                              {" "}
                               <span className="badge badge-ok">Connected</span>
-                              <div className="muted">@{account.username}</div>
+                              <span className="muted">@{account.username}</span>
                             </>
                           ) : (
-                            <div className="muted">Not connected</div>
+                            <span className="muted">Not connected</span>
                           )}
                         </div>
                         {account ? (
