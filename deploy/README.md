@@ -126,35 +126,33 @@ into the app containers.
 > as a build arg from `PUBLIC_URL`, so changing the public URL means rebuilding
 > the frontend image (`--build`), not just restarting the container.
 
-## 4. TLS
+## 4. First launch (build, then TLS)
 
 ```bash
 CERTBOT_EMAIL=you@example.com bash deploy/init-letsencrypt.sh
 ```
 
-This is multi-step because the two requirements are circular: nginx will not
-start without certificate files, and the certificate cannot be issued before
-nginx is answering the ACME challenge. The script installs a throwaway
-self-signed certificate, starts nginx, discards it, has Let's Encrypt replace it,
-and reloads. Use `STAGING=1` in front of it while DNS is still settling —
-staging has generous rate limits, production does not (five failures an hour).
+This both builds the stack and gets its certificate, because the two
+requirements are circular: nginx will not start without certificate files, and
+the certificate cannot be issued before nginx is serving the ACME challenge. The
+script:
 
-## 5. Launch
+1. installs a throwaway self-signed certificate, so nginx has something to load;
+2. builds and starts the whole stack — everything, not just nginx, because nginx
+   resolves its upstream hostnames at startup and refuses to boot while the
+   `web` and `frontend` containers do not exist;
+3. deletes the placeholder and has Let's Encrypt replace it over the webroot;
+4. reloads nginx.
+
+Use `STAGING=1` in front of it while DNS is still settling — staging has
+generous rate limits, production allows five failures an hour.
+
+## 5. Create the admin and verify
 
 ```bash
 cd deploy
-docker compose --env-file .env up -d --build
-docker compose ps                       # everything should read "healthy"
 docker compose exec web python manage.py createsuperuser
-```
-
-The first `up` builds both images and applies migrations automatically — the
-entrypoint runs `migrate` and `collectstatic` for the web container only, so the
-worker and beat containers never race the schema.
-
-## 6. Verify
-
-```bash
+docker compose ps                       # everything should read "healthy"
 curl -s https://bagworkrh.com/api/health/ | python3 -m json.tool
 ```
 
@@ -165,7 +163,9 @@ every minute, so give it a minute after the first start before believing it.
 Then walk the app: sign up, connect X, join a campaign, and watch
 `docker compose logs -f web worker beat` for the discovery poll landing.
 
-## 7. Point X at the production callback
+Subsequent deploys do not need the TLS script — just §8.
+
+## 6. Point X at the production callback
 
 In the X developer portal, register the production callback **alongside** the
 local one:
@@ -179,7 +179,7 @@ string exactly, so the scheme and host both have to be right — the failure mod
 when they are not is X's generic *"Something went wrong"* on the consent screen
 and no callback ever arriving (`docs/09` covers this in full).
 
-## 8. Backups
+## 7. Backups
 
 `backend/scripts/backup_db.sh` assumes a PostgreSQL server on the host; here the
 server is in the `db` container, so `deploy/backup.sh` runs the dump and its
@@ -200,7 +200,7 @@ crontab -e
 Then get those dumps off the machine, and **run the restore drill** — an
 untested backup is a hope, not a backup.
 
-## 9. Deploying a change
+## 8. Deploying a change
 
 ```bash
 git pull
@@ -210,7 +210,7 @@ cd deploy && docker compose --env-file .env up -d --build
 Docker rebuilds only what changed, and migrations run on web startup. If you
 changed `PUBLIC_URL`, the frontend rebuild is what makes it take effect.
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Cause |
 |---|---|
@@ -222,7 +222,7 @@ changed `PUBLIC_URL`, the frontend rebuild is what makes it take effect.
 | `redis: "error"` in health | The `redis` container is down or `REDIS_URL` is wrong — it must say `redis://redis:6379/0`, the compose service name, not `localhost`. |
 | `heartbeat: "unset"` | The `beat` container is not running. Scheduled work is not happening. |
 
-## 11. What this does and does not give you
+## 10. What this does and does not give you
 
 **Free, indefinitely:** 2 OCPU / 12 GB ARM, 200 GB disk, 10 TB/month egress —
 comfortably more than this stack needs.

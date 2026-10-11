@@ -43,9 +43,14 @@ $COMPOSE run --rm --no-deps --entrypoint sh nginx -c "\
     -out /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
     -subj /CN=$DOMAIN"
 
-echo "==> starting nginx"
-$COMPOSE up -d --no-deps --force-recreate nginx
-sleep 3
+echo "==> building and starting the stack"
+# The whole stack, not just nginx. nginx resolves its upstream hostnames ("web",
+# "frontend") from Docker's DNS as it loads its configuration, so it will refuse
+# to start while those containers do not exist yet — and without nginx there is
+# nothing to answer the ACME challenge. It starts here on the placeholder
+# certificate and is reloaded with the real one below.
+$COMPOSE up -d --build
+sleep 5
 
 echo "==> discarding the placeholder"
 $COMPOSE run --rm --no-deps --entrypoint sh nginx -c "\
