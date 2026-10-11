@@ -1,0 +1,95 @@
+# bagworkRH — nginx in front of Next.js (the site) and Django (the API).
+#
+# One domain serves both, deliberately: same-origin means no CORS to configure,
+# no cross-site cookie problems, and only one host for a provider's OAuth
+# callback to be registered against. Requests under /api/ and /admin/ are
+# Django; everything else is the Next.js app.
+#
+# This file is a template: the nginx image runs envsubst over /etc/nginx/templates/
+# at startup, so ${DOMAIN} comes from the environment. nginx's own variables
+# ($host, $scheme, $request_uri) are untouched — envsubst is only given the
+# container's environment-variable names.
+
+upstream django {
+    server web:8000;
+}
+
+upstream nextjs {
+    server frontend:3000;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    # Let's Encrypt validates over plain HTTP, so this path must not redirect.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Mirrors the Django security headers for responses nginx serves itself.
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+
+    client_max_body_size 12m;
+
+    # Collected by `manage.py collectstatic` in the web container and shared into
+    # this one read-only (see the `static` volume in docker-compose.yml).
+    location /static/ {
+        alias /srv/static/;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    # Django: the versioned API, the health probe and the admin.
+    location /api/ {
+        proxy_pass http://django;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Load-bearing: Django's SECURE_PROXY_SSL_HEADER trusts this, and without
+        # it SECURE_SSL_REDIRECT would bounce every request back to itself.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 75s;
+    }
+
+    location /admin/ {
+        proxy_pass http://django;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Everything else is the Next.js app.
+    location / {
+        proxy_pass http://nextjs;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

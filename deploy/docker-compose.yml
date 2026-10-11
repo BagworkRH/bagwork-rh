@@ -1,0 +1,153 @@
+# bagworkRH — the whole platform on one VM.
+#
+# Sized for an Oracle Cloud Always Free instance (2 OCPU / 12 GB ARM). Every
+# piece is small because they share one box, so Postgres and Redis are given
+# modest limits and Celery runs two workers.
+#
+# Exactly one of everything, on purpose. `beat` especially must never be scaled:
+# two schedulers double-fire every periodic task, which for this app means
+# duplicate discovery polls and duplicate reconciliation.
+#
+# Start it with:  docker compose --env-file .env up -d --build
+# The `name:` keeps volumes and containers grouped as `bagworkrh` regardless of
+# the directory the repo is checked out into.
+
+name: bagworkrh
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Not published to the host: only the app containers need it, and they reach
+    # it over the compose network. The database must never face the internet.
+    expose:
+      - "5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    expose:
+      - "6379"
+
+  web:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Shared with nginx, which serves it at /static/.
+      - static:/app/staticfiles
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 5
+
+  worker:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: .env
+    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency", "2"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: .env
+    command: ["celery", "-A", "config", "beat", "-l", "info"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        # Inlined into the client bundle at build time, which is why it is a
+        # build arg rather than a runtime variable — see frontend/Dockerfile.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    environment:
+      # Substituted into /etc/nginx/templates/app.conf.template at startup.
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/app.conf.template:/etc/nginx/templates/app.conf.template:ro
+      - static:/srv/static:ro
+      - certbot-certs:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+
+  # Not started by `up`: this exists so issuance and renewal have the same
+  # volumes as nginx. Run it on demand:
+  #   docker compose --profile tools run --rm certbot renew --webroot -w /var/www/certbot
+  certbot:
+    image: certbot/certbot
+    profiles: ["tools"]
+    volumes:
+      - certbot-certs:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+
+volumes:
+  pgdata:
+  redisdata:
+  static:
+  certbot-certs:
+  certbot-webroot:

@@ -1,0 +1,13 @@
+# Never needed inside the image: the virtualenv and local database are host
+# artefacts, and secrets must come from the environment, not the build context.
+.venv/
+venv/
+db.sqlite3
+staticfiles/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example

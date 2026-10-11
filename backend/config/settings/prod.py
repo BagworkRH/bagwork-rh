@@ -11,3 +11,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+
+# Nginx terminates TLS and speaks plain HTTP to Gunicorn, so without this Django
+# never learns the original request was https — and SECURE_SSL_REDIRECT would
+# then redirect every request to itself, forever. The matching header is set in
+# deploy/nginx/app.conf.template.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

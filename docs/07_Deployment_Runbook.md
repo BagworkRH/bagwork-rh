@@ -271,33 +271,36 @@ Then, end to end, as a seller:
 
 ## 7. Deploy the application
 
-**Frontend** — Vercel or any Next.js host:
+The application runs as a Docker Compose stack — nginx in front of Gunicorn and
+Next.js, with Celery worker and beat, Redis and PostgreSQL — which is sized to
+run the whole thing on a single Oracle Cloud Always Free VM for £0/month.
+
+**See [`deploy/README.md`](../deploy/README.md) for the full procedure**: VM
+setup, DNS, configuration, TLS, launch, backups and troubleshooting.
 
 ```bash
-cd frontend
-vercel --prod            # or connect the repo in the dashboard
+bash deploy/bootstrap.sh                       # Docker, compose, firewall
+cp deploy/.env.example deploy/.env             # fill in, never commit
+CERTBOT_EMAIL=you@example.com bash deploy/init-letsencrypt.sh
+cd deploy && docker compose --env-file .env up -d --build
 ```
 
-Set `NEXT_PUBLIC_API_URL=https://api.bagworkrh.com` in the host's environment.
+Two things worth knowing before you change anything here:
 
-**Backend** — Gunicorn behind Nginx with TLS:
+- **`beat` must run in exactly one place.** A second scheduler double-fires every
+  periodic task — for this app, duplicate discovery polls and duplicate
+  reconciliation. The compose file defines exactly one, and it should stay that
+  way.
+- **`NEXT_PUBLIC_API_URL` is a build-time value**, inlined into the browser
+  bundle rather than read at runtime. Changing the public URL means rebuilding
+  the frontend image (`--build`), not restarting the container.
 
-```bash
-pip install gunicorn
-gunicorn config.wsgi:application \
-  --chdir backend --env-file backend/.env \
-  --workers 4 --timeout 60 --bind 127.0.0.1:8000
-```
+The site and the API share one domain (`https://<DOMAIN>`), with nginx routing
+`/api/` and `/admin/` to Django and everything else to Next.js. That replaces
+the `api.`-subdomain split this document previously assumed: being same-origin
+removes the entire CORS question, and leaves exactly one hostname for X to have
+registered as a callback.
 
-**Workers** — both required, or claims never reconcile:
-
-```bash
-celery -A config worker -l info     # task execution
-celery -A config beat  -l info      # schedules the listener + heartbeat
-```
-
-`beat` must run in exactly one place: a second beat double-fires every
-scheduled task.
 
 ## 8. Mainnet repeat
 

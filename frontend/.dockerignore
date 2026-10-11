@@ -1,0 +1,8 @@
+# Built inside the image instead: node_modules and .next are host artefacts and
+# must never be copied in, and .env.local holds local values that would silently
+# bake into the client bundle.
+node_modules/
+.next/
+.env.local
+.env*.local
+npm-debug.log*
