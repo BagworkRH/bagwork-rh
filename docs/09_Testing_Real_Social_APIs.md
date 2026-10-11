@@ -29,7 +29,7 @@ want write access for a read-only discovery product).
 
 **b. Register the callback URL exactly:**
 ```
-http://127.0.0.1:8000/api/v1/x/x/callback/
+http://127.0.0.1:8001/api/v1/x/x/callback/
 ```
 Note the doubled `x`: social routes are mounted at `/api/v1/x/` and the
 per-platform path adds the platform again (`x/<platform>/callback/`). Registering
@@ -43,7 +43,7 @@ they are the same machine.
 SOCIAL_PROVIDER_MODE=official
 X_CLIENT_ID=your-consumer-key
 X_CLIENT_SECRET=your-consumer-secret
-X_REDIRECT_URI=http://127.0.0.1:8000/api/v1/x/x/callback/
+X_REDIRECT_URI=http://127.0.0.1:8001/api/v1/x/x/callback/
 ```
 
 **d. Check configuration, no network:**
@@ -98,7 +98,7 @@ TikTok requires an approved app before `video.list` returns anything.
 
 1. developers.tiktok.com → Create App → choose **Content Posting API**.
 2. Request `user.info.basic` and `video.list`.
-3. Set the redirect URL to `http://127.0.0.1:8000/api/v1/x/tiktok/callback/`
+3. Set the redirect URL to `http://127.0.0.1:8001/api/v1/x/tiktok/callback/`
    (note `/x/tiktok/` — social routes are mounted under `/x/` for every platform).
 4. **Submit for review.** This is the wait. Meanwhile test X.
 5. Make one **public** video. `video/list` only returns public posts.
@@ -135,7 +135,7 @@ for p in SocialPost.objects.order_by('-discovered_at')[:3]:
 ## 4. Local callback without a public URL
 
 X only redirects to a registered URL. For local dev either tunnel
-(`cloudflared tunnel --url http://localhost:8000`, then register the tunnel URL)
+(`cloudflared tunnel --url http://localhost:8001`, then register the tunnel URL)
 or register the localhost URL — X generally allows it while the app is in
 development.
 

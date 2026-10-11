@@ -113,7 +113,7 @@ cd backend
 ```bash
 cd backend
 .venv/Scripts/activate          # or: source .venv/bin/activate
-python scripts/load_test.py --url http://localhost:8000 --workers 20 --requests 400
+python scripts/load_test.py --url http://localhost:8001 --workers 20 --requests 400
 ```
 
 The script reports request count, error rate, throughput, and p50/p95 latency
