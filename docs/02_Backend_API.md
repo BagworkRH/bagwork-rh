@@ -30,7 +30,8 @@ Key points:
 
 ## Key endpoints
 `/api/v1/auth/register|login|logout/`, `/api/v1/me/`, `/me/seller/`,
-`/me/wallets/`, `/me/rewards/`, `/me/claims/`;
+`/me/wallets/`, `/me/rewards/`, `/me/claims/`, `/me/posts/`, `/me/dashboard/`,
+`/me/campaigns/`;
 `/api/v1/x/<platform>/connect|callback|disconnect/`, `/x/platforms/`;
 `/api/v1/campaigns/`, `/campaigns/{slug}/`, `/campaigns/{id}/join/`;
 `/api/v1/posts/`, `/posts/{id}/`, `/posts/submit/`;

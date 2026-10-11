@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import JoinCampaignButton from "@/components/JoinCampaignButton";
 import { apiRequest } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
 import type { Campaign } from "@/types";
@@ -80,9 +81,10 @@ export default async function CampaignDetailPage({
         </ul>
 
         <div className="row">
-          <Link href="/dashboard" className="btn btn-primary">
-            Join campaign
-          </Link>
+          <JoinCampaignButton
+            campaignId={campaign.id}
+            initiallyJoined={campaign.joined}
+          />
         </div>
         <p className="muted" style={{ marginTop: 12 }}>
           Rules and anti-fraud measures apply. Posts are verified before any
