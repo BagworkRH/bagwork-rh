@@ -204,6 +204,11 @@ class SocialPost(models.Model):
     )
     rejection_reason = models.CharField(max_length=255, blank=True)
     last_metrics_sync = models.DateTimeField(null=True, blank=True)
+    # Set when the retention window has passed and the platform-derived content
+    # was stripped out. The row itself survives on purpose: a reward may
+    # reference it, and `Reward.post` is PROTECT, so deleting the post would
+    # destroy the financial audit trail that has to outlive the X data.
+    erased_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     # Denormalized current metrics for display.

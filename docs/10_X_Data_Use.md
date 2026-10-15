@@ -64,14 +64,46 @@ creator-scoped replacement, so a regression re-exposing X data fails CI.
 
 ### Retention
 
-Not yet implemented. Posts are retained for the life of a campaign so reward
-calculations stay reproducible and auditable. **A concrete retention period
-(e.g. campaign end + 12 months) and a user-initiated deletion endpoint are
-pre-launch work.** X's compliance review will likely ask about both.
+**Implemented.** Platform-derived content is erased `SOCIAL_RETENTION_DAYS` after
+the campaign it belongs to ends — 365 days by default, configurable per
+environment. The window starts at the campaign's *end* rather than at discovery,
+so it measures how long the data stays operationally useful rather than how long
+ago it happened to be found.
+
+`apps.social.erasure.purge_expired_social_data` runs daily via Celery beat
+(`purge-expired-social-data`). Per post:
+
+| Erased | Kept |
+|---|---|
+| `text_snapshot`, `post_url`, `external_post_id` (tombstoned) | the row itself, its `verification_status` and `originality_evidence` |
+| engagement counters (zeroed) | the `Reward` and its amount |
+| `PostMetricSnapshot` rows, including `raw_provider_payload` | the audit trail around them |
+
+The row survives because `Reward.post` is PROTECT: deleting it would either
+cascade into the ledger or fail outright, so erasure anonymises in place. A post
+with no reward is handled identically, for consistency and so the audit trail
+never has holes. Erasure is idempotent (`SocialPost.erased_at`), so a re-run —
+or a manual one — is safe.
 
 ### Deletion
 
-A creator can disconnect their account (`POST /api/v1/x/<platform>/disconnect/`),
-which marks the connection `DISCONNECTED` and stops future polling. This does
-**not** delete stored posts or tokens, because rewards already paid must remain
-auditable. Hard erasure is unimplemented.
+Two different operations, and the distinction is the point:
+
+- **Disconnecting** (`POST /api/v1/x/<platform>/disconnect/`) marks the account
+  `DISCONNECTED` and stops polling. It erases nothing, because the creator may
+  simply reconnect.
+- **Erasure** (`POST /api/v1/me/data-deletion/` with `{"confirm": "DELETE"}`)
+  removes the person's identifiers and every piece of platform-derived data:
+  post content anonymised as above, stored OAuth credentials destroyed and the
+  token revoked at the platform, linked-account handles replaced and accounts
+  disconnected, pending OAuth state and API tokens deleted, and the account's own
+  email, username and names replaced with the password made unusable and the
+  account deactivated.
+
+**Rewards and claims are deliberately retained**, with their amounts and statuses.
+They are the audit trail a payout dispute is settled against, and `Reward.seller`
+is PROTECT — so they cannot be removed without destroying the ledger. This is a
+documented limitation rather than an oversight: every erasure writes a
+`SELLER_DATA_ERASED` audit entry recording `financial_records_retained: true`, so
+the omission is visible in the record rather than silent. The user row itself is
+kept, anonymised, because the ledger's foreign keys point at it.

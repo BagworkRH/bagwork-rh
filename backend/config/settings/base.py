@@ -238,6 +238,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.social.tasks.purge_social_oauth_states",
         "schedule": timedelta(hours=6),
     },
+    # Erase platform content past the retention window (SOCIAL_RETENTION_DAYS
+    # after a campaign ends). Daily, because the window is measured in months.
+    "purge-expired-social-data": {
+        "task": "apps.social.tasks.purge_expired_social_data",
+        "schedule": timedelta(hours=24),
+    },
     # Phase 8: worker/beat liveness heartbeat written every minute.
     "monitoring-heartbeat": {
         "task": "apps.monitoring.tasks.heartbeat",
@@ -274,6 +280,19 @@ SOCIAL_ENCRYPTION_KEY = os.environ.get("SOCIAL_ENCRYPTION_KEY", "")
 # `callback`. Bounds the window in which a leaked state could be replayed; long
 # enough to cover a provider login and consent screen.
 SOCIAL_OAUTH_STATE_TTL_SECONDS = int(os.environ.get("SOCIAL_OAUTH_STATE_TTL_SECONDS", "600"))
+
+# How long platform-derived content is kept after a campaign ends, in days.
+#
+# Measured from the campaign's end so the clock starts when the data stops being
+# operationally useful, not when it happened to be discovered. A year is the
+# balance the X data-use note describes: long enough for a payout dispute to be
+# investigated against the post that earned it, short enough to be a retention
+# policy rather than indefinite storage.
+#
+# Only the *content* is erased — text, URL, external id, metrics and raw provider
+# payloads. The row, the verification outcome and the reward stay, because the
+# financial record has to remain auditable after the X data is gone.
+SOCIAL_RETENTION_DAYS = int(os.environ.get("SOCIAL_RETENTION_DAYS", "365"))
 
 # Blockchain (Spec 04)
 # RPC_URL / CONTRACT_ADDRESS empty => the chain services run disabled and

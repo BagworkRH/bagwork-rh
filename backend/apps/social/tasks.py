@@ -284,3 +284,16 @@ def purge_social_oauth_states(older_than_hours: int = 24):
     cutoff = timezone.now() - timedelta(hours=older_than_hours)
     deleted, _ = SocialOAuthState.objects.filter(expires_at__lt=cutoff).delete()
     return {"status": "ok", "deleted": deleted}
+
+
+@shared_task
+def purge_expired_social_data(retention_days=None):
+    """Erase platform content past its retention window (see `apps.social.erasure`).
+
+    Scheduled daily. This is the mechanism behind the retention period the X
+    data-use note commits to, so it is the one thing that has to actually run for
+    that promise to be true.
+    """
+    from .erasure import purge_expired_social_data as _purge  # noqa: PLC0415
+
+    return _purge(retention_days)

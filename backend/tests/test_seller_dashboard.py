@@ -62,9 +62,11 @@ class SellerDashboardTests(TestCase):
         self.assertEqual(resp.data["pending_rewards"], 1)
 
     def test_sums_fractional_decimal_amounts(self):
-        # Values kept exact in binary on purpose: the test database is SQLite,
-        # which stores DecimalField as a float, so an 18-decimal-place sum would
-        # be a test of the engine rather than of this aggregate.
+        # Values chosen to be exact in binary on purpose: the dev/test database is
+        # SQLite, which stores DecimalField as a float, so an 18-decimal-place sum
+        # here would be a test of the storage engine rather than of this
+        # aggregate. Production runs PostgreSQL (see deploy/), where the same
+        # aggregate is exact to all 18 places.
         campaign = make_campaign()
         self._reward(campaign, "0.5", RewardStatus.AVAILABLE)
         self._reward(campaign, "0.25", RewardStatus.AVAILABLE)

@@ -13,6 +13,7 @@ from apps.accounts.serializers import UserSerializer
 from apps.campaigns.models import CampaignParticipation
 from apps.rewards.exceptions import RewardEngineError
 from apps.rewards.models import Reward, RewardStatus
+from apps.social.erasure import erase_seller
 from apps.social.models import PostVerificationStatus, SocialPost
 from apps.wallets.models import Claim, Wallet
 from apps.wallets.services import (
@@ -312,3 +313,31 @@ def dashboard(request):
         "total_engagement": total_engagement,
     }
     return Response(SellerDashboardSerializer(data).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def data_deletion(request):
+    """Erase the signed-in seller's platform data, at their own request.
+
+    Irreversible, so it demands an explicit confirmation in the body rather than
+    firing on a stray request.
+
+    Financial records survive. `Reward.seller` and `Reward.post` are PROTECT, and
+    rewards, claims and their amounts are what a payout dispute is settled
+    against — so they cannot be removed without destroying the ledger. What goes
+    is everything that identifies the person or came from the platform: post
+    content, stored OAuth credentials, linked-account handles, and the account's
+    own identifiers.
+    """
+    if str(request.data.get("confirm", "")).strip().upper() != "DELETE":
+        return Response(
+            {
+                "detail": 'Send {"confirm": "DELETE"} to erase your data. '
+                "This cannot be undone."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    summary = erase_seller(request.user, actor=request.user)
+    return Response(summary, status=status.HTTP_200_OK)
