@@ -192,7 +192,7 @@ export type PostVerificationStatus =
   | "PROVIDER_ERROR"
   | "SUSPICIOUS_ACTIVITY";
 
-export type SocialPlatform = "x" | "tiktok";
+export type SocialPlatform = "x";
 
 export type SocialAccountStatus = "CONNECTED" | "PENDING" | "ERROR" | "REVOKED";
 

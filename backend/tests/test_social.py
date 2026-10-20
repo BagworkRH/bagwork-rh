@@ -38,19 +38,19 @@ class SocialAccountLinkingTests(TestCase):
         self.assertEqual(account.status, "DISCONNECTED")
 
     def test_same_provider_id_coexists_across_platforms(self):
-        # X and TikTok both issue numeric ids, so identity must be scoped to
-        # the platform or linking one would silently overwrite the other.
+        # Networks hand out numeric ids independently, so identity must be scoped
+        # to the platform or linking one would silently overwrite the other.
         user, profile = make_user()
         SocialAccount.objects.create(
             seller=profile, platform=SocialPlatform.X, provider_user_id="777",
             username="alice",
         )
-        tiktok = SocialAccount.objects.create(
-            seller=profile, platform=SocialPlatform.TIKTOK, provider_user_id="777",
+        other = SocialAccount.objects.create(
+            seller=profile, platform=SocialPlatform.INSTAGRAM, provider_user_id="777",
             username="alice",
         )
         self.assertEqual(SocialAccount.objects.filter(seller=profile).count(), 2)
-        self.assertEqual(tiktok.provider_user_id, "777")
+        self.assertEqual(other.provider_user_id, "777")
 
     def test_seller_cannot_link_same_platform_twice(self):
         user, profile = make_user()

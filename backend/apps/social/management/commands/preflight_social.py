@@ -22,12 +22,11 @@ from apps.social.models import SocialPlatform
 from apps.social.providers import provider_mode
 from apps.social.providers.base import SocialProviderError
 from apps.social.providers.official import OfficialXProvider, _rfc3339
-from apps.social.providers.tiktok import OfficialTikTokProvider
 
-# Never echoed, only reported as present/absent.
+# Never echoed, only reported as present/absent. One entry per *served* platform,
+# so this cannot advertise credentials for a network with no adapter.
 SECRET_VARS = {
     SocialPlatform.X: ("X_CLIENT_ID", "X_CLIENT_SECRET", "X_REDIRECT_URI"),
-    SocialPlatform.TIKTOK: ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_REDIRECT_URI"),
 }
 
 
@@ -37,7 +36,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--call",
-            choices=["x", "tiktok", "all"],
+            choices=["x", "all"],
             default=None,
             help="Also exercise the discovery endpoints with the configured token.",
         )
@@ -58,12 +57,8 @@ class Command(BaseCommand):
             )
             return
 
-        if options["call"] == "all":
-            targets = ["x", "tiktok"]
-        elif options["call"]:
-            targets = [options["call"]]
-        else:
-            targets = ["x", "tiktok"]
+        # "all" and a bare run both mean every served platform; there is one.
+        targets = [options["call"]] if options["call"] not in (None, "all") else ["x"]
         for platform in targets:
             if self._check_config(platform):
                 self._check_call(platform, options)
@@ -85,7 +80,7 @@ class Command(BaseCommand):
         return True
 
     def _check_call(self, platform, options):
-        provider = OfficialXProvider() if platform == "x" else OfficialTikTokProvider()
+        provider = OfficialXProvider()
         token = options["token"] or self._stored_token(platform)
         if not token:
             self.stdout.write(
@@ -97,10 +92,7 @@ class Command(BaseCommand):
             return
         self.stdout.write("  making an authenticated call...")
         try:
-            if platform == "x":
-                self._call_x(provider, token, options)
-            else:
-                self._call_tiktok(provider, token, options)
+            self._call_x(provider, token, options)
         except SocialProviderError as exc:
             self.stdout.write(self.style.ERROR(f"  provider error: {exc}"))
         except Exception as exc:  # noqa: BLE001 - a preflight tool reports anything
@@ -161,29 +153,5 @@ class Command(BaseCommand):
                 self.style.WARNING(
                     "  no posts found: post something publicly and re-run, or the "
                     "token lacks timeline access."
-                )
-            )
-
-    def _call_tiktok(self, provider, token, options):
-        identity = provider.get_account(token)
-        self.stdout.write(
-            f"  user/info  -> {identity.get('username')} "
-            f"({identity.get('provider_user_id')})"
-        )
-        body = provider._list_videos(token, None)  # noqa: SLF001 - deliberate
-        videos = (body.get("data") or {}).get("videos") or []
-        self.stdout.write(f"  video/list -> {len(videos)} video(s)")
-        if videos and options["verbose"]:
-            self.stdout.write(json.dumps(videos[0], indent=2)[:1500])
-        for video in videos[:5]:
-            p = provider.normalize_video(video)
-            self.stdout.write(
-                f"    {p['post_id']}  {str(p['created_at'])[:19]}  text={p['text'][:40]!r}"
-            )
-        if not videos:
-            self.stdout.write(
-                self.style.WARNING(
-                    "  no videos: make one public and re-run, or the app is not "
-                    "approved for video.list."
                 )
             )

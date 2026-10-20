@@ -52,12 +52,12 @@ class SubmitPlatformScopingTests(TestCase):
 
     def test_same_id_on_two_platforms_are_not_duplicates(self):
         # Regression: the submit endpoint filtered on external_post_id alone,
-        # so a TikTok post was rejected as a duplicate of an X post that
-        # happened to share its numeric id.
+        # so a post was rejected as a duplicate of an unrelated one on another
+        # network that happened to share its numeric id.
         x_resp = self._submit(SocialPlatform.X)
         self.assertEqual(x_resp.status_code, status.HTTP_201_CREATED)
-        tt_resp = self._submit(SocialPlatform.TIKTOK)
-        self.assertEqual(tt_resp.status_code, status.HTTP_201_CREATED)
+        other_resp = self._submit(SocialPlatform.INSTAGRAM)
+        self.assertEqual(other_resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(SocialPost.objects.count(), 2)
 
     def test_same_id_on_same_platform_is_still_a_duplicate(self):
@@ -70,8 +70,8 @@ class SubmitPlatformScopingTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_response_exposes_platform_and_originality(self):
-        resp = self._submit(SocialPlatform.TIKTOK)
-        self.assertEqual(resp.data["platform"], SocialPlatform.TIKTOK)
+        resp = self._submit(SocialPlatform.INSTAGRAM)
+        self.assertEqual(resp.data["platform"], SocialPlatform.INSTAGRAM)
         self.assertIn("is_original", resp.data)
 
 

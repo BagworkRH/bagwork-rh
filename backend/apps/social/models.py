@@ -2,9 +2,9 @@
 
 The platform is deliberately not X-specific: a seller may link an account on
 any supported network, and a qualifying post may originate from any of them.
-`platform` is therefore part of every external identifier's identity — X and
-TikTok both issue numeric-looking post ids, so `(platform, external_id)` is
-the natural key rather than the id alone.
+`platform` is therefore part of every external identifier's identity — social
+networks hand out long numeric post ids that collide across sites, so
+`(platform, external_id)` is the natural key rather than the id alone.
 
 OAuth credentials are stored encrypted at rest; raw tokens are never logged.
 """
@@ -16,10 +16,16 @@ from apps.sellers.models import SellerProfile
 
 
 class SocialPlatform(models.TextChoices):
-    """Supported social networks. A post's platform is always one of these."""
+    """Networks the data model can represent.
+
+    This is the vocabulary the schema accepts, which is deliberately wider than
+    what a given build can *serve*: only platforms with an adapter in
+    `apps.social.providers.REGISTRY` can actually be connected, and the
+    connection API rejects the rest with a 404. X is currently the only served
+    platform; TikTok was removed when its app review never cleared.
+    """
 
     X = "x", "X (Twitter)"
-    TIKTOK = "tiktok", "TikTok"
     INSTAGRAM = "instagram", "Instagram"
     YOUTUBE = "youtube", "YouTube"
 
@@ -89,7 +95,7 @@ class SocialOAuthState(models.Model):
         on_delete=models.CASCADE,
         related_name="social_oauth_states",
     )
-    # PKCE verifier; blank for providers whose flow has no PKCE (e.g. TikTok).
+    # PKCE verifier; blank for providers whose flow has no PKCE.
     code_verifier = models.CharField(max_length=128, blank=True, default="")
     scopes = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -169,8 +175,8 @@ class SocialPost(models.Model):
     platform = models.CharField(
         max_length=16, choices=SocialPlatform.choices, default=SocialPlatform.X, db_index=True
     )
-    # Unique *per platform*: X and TikTok both issue numeric ids, so the bare
-    # id is not a natural key on its own.
+    # Unique *per platform*: networks hand out numeric ids that collide across
+    # sites, so the bare id is not a natural key on its own.
     external_post_id = models.CharField(max_length=64, db_index=True)
     seller = models.ForeignKey(SellerProfile, on_delete=models.PROTECT, related_name="posts")
     campaign = models.ForeignKey(
@@ -184,8 +190,7 @@ class SocialPost(models.Model):
     # Originality. Rewards are paid per *original* post, so a repost or a
     # quote must be distinguishable from a creator's own work. Set from the
     # provider's `referenced_tweets` where the platform exposes it; where it
-    # does not, a post is original by construction (e.g. a TikTok video is
-    # always the creator's own upload).
+    # does not, a post is original by construction.
     is_repost = models.BooleanField(default=False)
     is_quote = models.BooleanField(default=False)
     # Provenance of the originality claim. Absent provider confirmation, this

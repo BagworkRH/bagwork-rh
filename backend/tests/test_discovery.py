@@ -24,7 +24,6 @@ from apps.social.models import (
 from apps.social.providers.base import SocialProviderError
 from apps.social.providers.mock import MockSocialProvider
 from apps.social.providers.official import OfficialXProvider, _rfc3339
-from apps.social.providers.tiktok import OfficialTikTokProvider, _epoch_millis
 from apps.social.tasks import discover_posts_for_account, run_verification_on_post
 
 from .helpers import make_campaign, make_user
@@ -115,53 +114,6 @@ class XDiscoveryRequestTests(TestCase):
         self.assertLessEqual(len(fraction), 3)
 
 
-class TikTokDiscoveryTests(TestCase):
-    """TikTok's List Videos uses a millisecond cursor, not a date string."""
-
-    def test_uses_video_list_endpoint(self):
-        campaign = make_campaign(slug="tt-discovery")
-        captured = {}
-        # Inside the campaign window, which ends "now".
-        created = int((timezone.now() - timedelta(hours=1)).timestamp())
-
-        def fake_post(url, headers=None, params=None, json=None, timeout=None):
-            captured["url"] = url
-            captured["body"] = json
-            return _response(
-                {
-                    "data": {
-                        "videos": [
-                            {"id": "999", "title": "hey #ad", "create_time": created}
-                        ],
-                        "has_more": False,
-                    }
-                }
-            )
-
-        with patch("apps.social.providers.tiktok.requests.post", side_effect=fake_post):
-            found = OfficialTikTokProvider().discover_posts(
-                "tok", "open-id", campaign, campaign.start_at, timezone.now()
-            )
-        self.assertIn("/v2/video/list/", captured["url"])
-        self.assertEqual(captured["body"]["max_count"], 20)
-        self.assertEqual(len(found), 1)
-        # A TikTok video is the creator's own upload: original by construction.
-        self.assertFalse(found[0]["is_repost"])
-        self.assertIsNotNone(found[0]["created_at"].tzinfo)
-
-    def test_cursor_is_epoch_millis(self):
-        self.assertIsNone(_epoch_millis(None))
-        self.assertIsInstance(_epoch_millis(timezone.now()), int)
-
-    def test_normalize_reads_unix_seconds(self):
-        payload = OfficialTikTokProvider.normalize_video(
-            {"id": "1", "title": "t", "create_time": 1757000000, "share_url": "u"}
-        )
-        self.assertEqual(payload["post_id"], "1")
-        self.assertEqual(payload["text"], "t")
-        self.assertEqual(payload["post_url"], "u")
-
-
 class DiscoveryPollerTests(TestCase):
     """Polling runs forever, so it must be safe to repeat and safe to fail."""
 
@@ -240,7 +192,7 @@ class DiscoveryPollerTests(TestCase):
     def test_watermark_is_per_platform(self):
         self._poll([])
         self.campaign.refresh_from_db()
-        self.assertIsNone(self.campaign.discovery_watermark(SocialPlatform.TIKTOK))
+        self.assertIsNone(self.campaign.discovery_watermark(SocialPlatform.INSTAGRAM))
 
     def test_provider_error_does_not_advance_the_watermark(self):
         # If we advanced it on failure, a transient outage would silently

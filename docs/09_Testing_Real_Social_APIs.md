@@ -10,16 +10,18 @@ back, mutates nothing, and never prints a secret.
 
 ## What you need
 
-| | X | TikTok |
-|---|---|---|
-| Where | [console.x.com](https://console.x.com) | [developers.tiktok.com](https://developers.tiktok.com) |
-| Cost | pay-per-use credits (no tiers) | free to apply |
-| Approval | immediate, but *some endpoints need review* | **app review required** |
-| Scopes we use | `tweet.read`, `users.read` | `user.info.basic`, `video.list` |
-| Effort | ~30 min | days-to-weeks (review queue) |
+X is the only served platform, so this is a single-provider runbook now. The
+provider layer is still platform-agnostic — adding a network back means an
+adapter plus one line in `apps.social.providers.REGISTRY` — but there is no
+second provider to verify against today.
 
-**Start with X.** TikTok needs an approved app, and waiting on a review is not a
-good use of your first pass.
+| | X |
+|---|---|
+| Where | [console.x.com](https://console.x.com) |
+| Cost | pay-per-use credits (no tiers) |
+| Approval | immediate, but *some endpoints need review* |
+| Scopes we use | `tweet.read`, `users.read` |
+| Effort | ~30 min |
 
 ## 1. X, end to end
 
@@ -92,19 +94,7 @@ Fixing the fixtures mattered as much as fixing the code: `test_refreshed_repost_
 — the end-to-end "a repost cannot earn" guarantee — had been asserting against
 `"reposted"`, so it passed while the gate was open.
 
-## 2. TikTok, end to end
-
-TikTok requires an approved app before `video.list` returns anything.
-
-1. developers.tiktok.com → Create App → choose **Content Posting API**.
-2. Request `user.info.basic` and `video.list`.
-3. Set the redirect URL to `http://127.0.0.1:8001/api/v1/x/tiktok/callback/`
-   (note `/x/tiktok/` — social routes are mounted under `/x/` for every platform).
-4. **Submit for review.** This is the wait. Meanwhile test X.
-5. Make one **public** video. `video/list` only returns public posts.
-6. `python manage.py preflight_social --call tiktok --verbose`
-
-## 3. The full pipeline
+## 2. The full pipeline
 
 Once preflight is green, prove the product end to end:
 
@@ -132,7 +122,7 @@ for p in SocialPost.objects.order_by('-discovered_at')[:3]:
    that matters most; a working happy path proves nothing on its own.
 6. `calculate_pending_rewards`, then check the Reward exists at the fixed rate.
 
-## 4. Local callback without a public URL
+## 3. Local callback without a public URL
 
 X only redirects to a registered URL. For local dev either tunnel
 (`cloudflared tunnel --url http://localhost:8001`, then register the tunnel URL)
@@ -148,11 +138,9 @@ development.
 | `HTTP 401` | Expired or revoked token; re-run the connect flow. |
 | `timeline -> 0 post(s)` | No posts in the window, or account is protected. Post something public. |
 | `referenced_tweets` missing from raw JSON | The field is not requested, or the endpoint ignores it. Stage 1 needs this — check the `tweet.fields` param. |
-| TikTok `403` on `video/list` | App not yet approved for the scope. |
 
 ## What "verified" means
 
-Stage 2 is done when: a real post on each platform pays out at the fixed rate,
-a real repost on each platform is rejected, and the raw payloads match what
-`normalize_post` / `normalize_video` expect. Until then, Stages 1 and 3 rest on
-documentation, not observation.
+Stage 2 is done when: a real post pays out at the fixed rate, a real repost is
+rejected, and the raw payloads match what `normalize_post` expects. Until then,
+Stages 1 and 3 rest on documentation, not observation.

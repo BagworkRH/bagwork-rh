@@ -23,31 +23,31 @@ from apps.social.providers import (
 )
 from apps.social.providers.base import SocialProvider, SocialProviderError
 from apps.social.providers.official import OfficialXProvider
-from apps.social.providers.tiktok import OfficialTikTokProvider
 from apps.social.services import link_social_account
 from apps.social.tasks import purge_social_oauth_states
 
 from .helpers import make_user
 
-# A deliberately ambiguous id: X and TikTok both hand out long numeric strings.
+# A deliberately ambiguous id: every social network hands out long numeric
+# strings, so the same digits can legitimately appear on two of them.
 AMBIGUOUS_ID = "7123456789012345678"
 
 
 class ProviderRegistryTests(TestCase):
-    def test_x_and_tiktok_are_registered(self):
-        self.assertIn("x", REGISTRY)
-        self.assertIn("tiktok", REGISTRY)
-        self.assertIn("x", available_platforms())
-        self.assertIn("tiktok", available_platforms())
+    def test_x_is_the_only_served_platform(self):
+        # TikTok was removed. The API must not advertise a network this build
+        # cannot actually connect: a listed platform with no adapter is a
+        # capability we claim and cannot honour.
+        self.assertEqual(list(REGISTRY), ["x"])
+        self.assertEqual(available_platforms(), ["x"])
 
-    def test_both_adapters_implement_the_interface(self):
+    def test_the_adapter_implements_the_interface(self):
         # The abstraction is only real if every adapter satisfies it.
-        for cls in (OfficialXProvider, OfficialTikTokProvider):
-            self.assertTrue(issubclass(cls, SocialProvider))
-            self.assertTrue(cls.platform)
+        self.assertTrue(issubclass(OfficialXProvider, SocialProvider))
+        self.assertTrue(OfficialXProvider.platform)
 
     def test_unknown_platform_raises_rather_than_defaulting_to_x(self):
-        # A typo must not silently route a TikTok post to X.
+        # A typo must not silently route another network's post to X.
         with override_settings(SOCIAL_PROVIDER_MODE="official"):
             with self.assertRaises(SocialProviderError):
                 get_provider("myspace")
@@ -64,12 +64,9 @@ class ProviderRegistryTests(TestCase):
         # resolve a leading-dot module, so every official-mode lookup raised
         # ModuleNotFoundError. Mock mode hid it because it imports directly.
         with override_settings(SOCIAL_PROVIDER_MODE="official"):
-            for platform, cls in (
-                ("x", OfficialXProvider),
-                ("tiktok", OfficialTikTokProvider),
-            ):
+            for platform in available_platforms():
                 provider = get_provider(platform)
-                self.assertIsInstance(provider, cls)
+                self.assertIsInstance(provider, OfficialXProvider)
                 self.assertEqual(provider.platform, platform)
 
     def test_legacy_x_provider_setting_still_works(self):
@@ -87,8 +84,8 @@ class PlatformIdentityTests(TestCase):
             published_at=timezone.now(),
         )
         tt_post = SocialPost.objects.create(
-            seller=profile, platform=SocialPlatform.TIKTOK, external_post_id=AMBIGUOUS_ID,
-            post_url=f"https://tiktok.com/@a/video/{AMBIGUOUS_ID}",
+            seller=profile, platform=SocialPlatform.INSTAGRAM, external_post_id=AMBIGUOUS_ID,
+            post_url=f"https://instagram.com/p/{AMBIGUOUS_ID}",
             published_at=timezone.now(),
         )
         self.assertNotEqual(x_post.pk, tt_post.pk)
@@ -98,13 +95,13 @@ class PlatformIdentityTests(TestCase):
         user, profile = make_user()
         identity = {"provider_user_id": "42", "username": "alice"}
         x_account = link_social_account(profile, identity, platform=SocialPlatform.X)
-        tt_account = link_social_account(profile, identity, platform=SocialPlatform.TIKTOK)
-        self.assertNotEqual(x_account.pk, tt_account.pk)
+        ig_account = link_social_account(profile, identity, platform=SocialPlatform.INSTAGRAM)
+        self.assertNotEqual(x_account.pk, ig_account.pk)
         self.assertEqual(SocialAccount.objects.filter(seller=profile).count(), 2)
 
     def test_seller_can_hold_one_account_per_platform(self):
         user, profile = make_user()
-        for platform in (SocialPlatform.X, SocialPlatform.TIKTOK):
+        for platform in (SocialPlatform.X, SocialPlatform.INSTAGRAM):
             SocialAccount.objects.create(
                 seller=profile, platform=platform, provider_user_id="1", username="alice"
             )
@@ -116,7 +113,8 @@ class PlatformIdentityTests(TestCase):
             profile, {"provider_user_id": "1", "username": "a"}, platform=SocialPlatform.X
         )
         link_social_account(
-            profile, {"provider_user_id": "1", "username": "a"}, platform=SocialPlatform.TIKTOK
+            profile, {"provider_user_id": "1", "username": "a"},
+            platform=SocialPlatform.INSTAGRAM,
         )
         x_account.status = "DISCONNECTED"
         x_account.save()
@@ -126,21 +124,28 @@ class PlatformIdentityTests(TestCase):
 
 
 class PlatformScopedOAuthStateTests(TestCase):
-    """An X callback must never complete a TikTok authorization."""
+    """A callback must never complete an authorization minted elsewhere."""
 
     def test_callback_url_is_platform_specific(self):
         self.assertIn("/x/callback/", reverse("social:callback", kwargs={"platform": "x"}))
-        self.assertIn(
-            "/tiktok/callback/", reverse("social:callback", kwargs={"platform": "tiktok"})
-        )
 
-    def test_state_issued_for_one_platform_is_useless_on_another(self):
-        # Platform is part of the state's identity: a TikTok callback must not
-        # be able to redeem a handle minted for X.
+    def test_unserved_platform_has_no_callback(self):
+        # The path segment is accepted by the URLconf, but a platform with no
+        # adapter has nothing to exchange the code with, so the route 404s
+        # rather than pretending to be connectable.
+        anon = APIClient()
+        resp = anon.get("/api/v1/x/instagram/callback/?state=x&code=c")
+
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_state_issued_for_another_platform_is_useless_here(self):
+        # Platform is part of the state's identity. The callback looks the state
+        # up scoped by platform, so a handle minted for a different network
+        # finds nothing and links nothing.
         user, profile = make_user()
         SocialOAuthState.objects.create(
             state="shared-handle",
-            platform=SocialPlatform.X,
+            platform=SocialPlatform.INSTAGRAM,
             user=user,
             code_verifier="v",
             scopes=["tweet.read"],
@@ -148,10 +153,10 @@ class PlatformScopedOAuthStateTests(TestCase):
         )
 
         anon = APIClient()
-        resp = anon.get("/api/v1/x/tiktok/callback/?state=shared-handle&code=c")
+        resp = anon.get("/api/v1/x/x/callback/?state=shared-handle&code=c")
 
         self.assertEqual(resp.status_code, status.HTTP_302_FOUND)
-        self.assertIn("error=", resp["Location"])
+        self.assertIn("error=invalid_state", resp["Location"])
         self.assertEqual(SocialAccount.objects.count(), 0)
 
 
@@ -222,10 +227,10 @@ class OAuthCallbackFlowTests(TestCase):
         self.assertIn("error=invalid_state", resp["Location"])
 
     def test_connect_records_a_pending_state(self):
-        state = self._connect("tiktok")
+        state = self._connect("x")
 
         pending = SocialOAuthState.objects.get(state=state)
-        self.assertEqual(pending.platform, SocialPlatform.TIKTOK)
+        self.assertEqual(pending.platform, SocialPlatform.X)
         self.assertEqual(pending.user, self.user)
         self.assertTrue(pending.is_usable())
 
@@ -259,8 +264,7 @@ class PlatformApiTests(TestCase):
         resp = self.client.get("/api/v1/x/platforms/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         ids = [p["id"] for p in resp.data["platforms"]]
-        self.assertIn("x", ids)
-        self.assertIn("tiktok", ids)
+        self.assertEqual(ids, ["x"])
 
     def test_list_platforms_is_public(self):
         # Available platforms describe the build, not the caller, and onboarding

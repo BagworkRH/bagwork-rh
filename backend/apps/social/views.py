@@ -1,8 +1,8 @@
 """Social platform connection API (Spec 03).
 
-Platform-agnostic: every route takes a `platform` segment so X, TikTok and any
-future network share one implementation. A seller may connect several platforms
-at once — they are independent accounts, not alternatives.
+Platform-agnostic: every route takes a `platform` segment so X and any future
+network share one implementation. A seller may connect several platforms at
+once — they are independent accounts, not alternatives.
 """
 import logging
 import secrets
@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 # OAuth scopes per platform. Platforms differ; the mock accepts anything.
 REQUIRED_SCOPES = {
     SocialPlatform.X: ["tweet.read", "users.read"],
-    SocialPlatform.TIKTOK: ["user.info.basic", "video.list"],
 }
 
 

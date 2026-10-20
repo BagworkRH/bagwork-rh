@@ -29,9 +29,14 @@ def is_mock(platform: str | None = None) -> bool:
 
 
 # platform -> import path of its official adapter.
+#
+# X is the only served platform. TikTok was removed rather than left
+# half-wired: its Content Posting API needs an app review that never cleared, so
+# it was a platform we could not actually serve, and shipping it advertised a
+# capability the build did not have. The registry is still the single entry
+# point, so adding a network back is one line here plus its adapter.
 REGISTRY = {
     "x": ".official:OfficialXProvider",
-    "tiktok": ".tiktok:OfficialTikTokProvider",
 }
 
 
@@ -44,7 +49,7 @@ def get_provider(platform: str = "x", user=None):
     """Return the provider adapter for `platform`.
 
     Raises SocialProviderError for an unknown platform rather than silently
-    falling back to X, so a typo cannot route a TikTok post to X.
+    falling back to X, so a typo cannot route another network's post to X.
     """
     if provider_mode() == "mock":
         from .mock import MockSocialProvider  # noqa: PLC0415

@@ -5,8 +5,8 @@ Flow: authorize -> callback (verify state/PKCE) -> exchange code -> identity
 connected.
 
 Identities are keyed by `(platform, provider_user_id)`: ids are only unique
-within their own platform, so a seller can hold the same numeric id on X and
-TikTok without one overwriting the other.
+within their own platform, so a seller can hold the same numeric id on two
+networks without one overwriting the other.
 """
 import json
 

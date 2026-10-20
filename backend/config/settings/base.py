@@ -197,9 +197,8 @@ CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULE = {
     # Social discovery (Stage 3). Polls each connected account per active
     # campaign. 5 minutes keeps a creator's reward within minutes of posting
-    # while staying well inside X's 900 req/15min per-user limit and TikTok's
-    # video.list page cap. Tied to the per-campaign watermark, so a tick that
-    # finds nothing new costs one request.
+    # while staying well inside X's 900 req/15min per-user limit. Tied to the
+    # per-campaign watermark, so a tick that finds nothing new costs one request.
     "poll-social-discovery": {
         "task": "apps.social.tasks.poll_active_campaigns",
         "schedule": timedelta(minutes=5),
@@ -264,11 +263,6 @@ SOCIAL_PROVIDER_MODE = os.environ.get("SOCIAL_PROVIDER_MODE", "official")
 X_CLIENT_ID = os.environ.get("X_CLIENT_ID", "")
 X_CLIENT_SECRET = os.environ.get("X_CLIENT_SECRET", "")
 X_REDIRECT_URI = os.environ.get("X_REDIRECT_URI", "")
-
-# TikTok — https://developers.tiktok.com
-TIKTOK_CLIENT_KEY = os.environ.get("TIKTOK_CLIENT_KEY", "")
-TIKTOK_CLIENT_SECRET = os.environ.get("TIKTOK_CLIENT_SECRET", "")
-TIKTOK_REDIRECT_URI = os.environ.get("TIKTOK_REDIRECT_URI", "")
 
 # Key used to encrypt stored OAuth credentials at rest (Spec 02/03). Prefer a
 # dedicated value so rotating SECRET_KEY does not render every stored token

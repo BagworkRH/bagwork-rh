@@ -39,7 +39,7 @@ class SocialProvider(ABC):
         """Handle the OAuth callback; exchange code; return identity.
 
         The caller has already resolved `state` to a user and passes the matching
-        `code_verifier`; adapters whose flow has no PKCE (e.g. TikTok) ignore it.
+        `code_verifier`; an adapter whose flow has no PKCE ignores it.
         """
         raise NotImplementedError
 

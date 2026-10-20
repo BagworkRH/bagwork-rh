@@ -47,11 +47,12 @@ reward. Prove it by breaking the provider and asserting nothing is paid.
 **Not done (Stage 8):** alerting on provider unavailability. Right now it is
 logged, not paged.
 
-## Stage 2 — Real API credentials  (X DONE, TikTok blocked on review)
+## Stage 2 — Real API credentials  — DONE
 
-Neither adapter had ever been called against a live API. Everything in Stage 1
-was a hypothesis until this happened — and the first live call proved the
-suspicion right.
+The adapter had never been called against a live API. Everything in Stage 1 was a
+hypothesis until this happened — and the first live call proved the suspicion
+right. (TikTok has since been removed entirely: its app review never cleared, so
+it was a platform this build could not serve. See Stage 3.)
 
 **X — verified 2026-10-06.** Credentials are configured, an OAuth 2.0 + PKCE
 connect completed in a browser, and a real account (`@IsaacMadu9`) was linked
@@ -68,7 +69,6 @@ and read back through the real timeline endpoint.
 - [x] One end-to-end connect -> discover -> verify -> reward, live (2026-10-06)
       — run on a staff campaign, which skips the brand funding gate by design
 - [ ] The same on a brand-funded campaign (needs the funding loop from Stage 6)
-- [ ] TikTok app, Content Posting API credentials into env (blocked on app review)
 
 **The bug the live run caught.** `normalize_post` decided originality with
 `"reposted" in ref_types`. X never sends that string. So every real retweet was
@@ -95,29 +95,26 @@ Also found and fixed on the same run: `start_time` rejects microsecond precision
 discovery call fail with HTTP 400. `preflight_social` had its own copy of that
 bug, so the verification tool would have misreported the adapter.
 
-**Done when:** a real post on each platform pays out correctly, and a real
-repost on each platform is rejected. X's repost rejection is now proven against
-real payloads; the TikTok half still waits on app review.
+**Done when:** a real post pays out correctly, and a real repost is rejected.
+X's repost rejection is now proven against real payloads.
 
-**Still open:** TikTok credentials, and a full connect → discover → verify →
-reward against a funded campaign (which needs the funding loop from Stage 6).
+**Still open:** a full connect → discover → verify → reward against a funded
+campaign (which needs the funding loop from Stage 6).
 
 
 
 ## Stage 3 — Discovery, the actual product  — DONE (verified live on X)
 
-Creators previously pasted a URL into a test endpoint. `discover_posts` raised on
-both adapters. Discovery is now implemented for both platforms and scheduled.
+Creators previously pasted a URL into a test endpoint. `discover_posts` raised.
+Discovery is now implemented and scheduled.
 
 - [x] `discover_posts` for X via `GET /2/users/:id/timelines/reverse_chronological`
       (X renamed this endpoint; the old `/2/users/:id/tweets` path is gone)
-- [x] `discover_posts` for TikTok via `POST /v2/video/list/`. It does exist —
-      the earlier "no equivalent" assumption was wrong
 - [x] Celery beat schedule every 5 minutes, per campaign x connected account
 - [x] Idempotency: per-campaign per-platform watermark + `(platform, id)` uniqueness
 - [x] A provider error does NOT advance the watermark, so a transient outage
       cannot silently discard posts published during the gap
-- [x] 16 discovery tests
+- [x] 13 discovery tests
 
 **Done when:** a creator who links an account and posts gets the reward with no
 manual step.
@@ -146,7 +143,6 @@ principle, reached by a different route.
 **Known limits:**
 - One timeline page per poll (X `max_results=100`). A creator posting more than
   100 posts between polls would need pagination; unlikely but unbounded.
-- TikTok pagination is capped at 5 pages x 20 videos per poll.
 - X rate limits are per-user (900/15min); sharding, not a longer interval, is
   the answer at scale.
 
@@ -249,15 +245,14 @@ rehearsal.
 ## Stage 7 — Frontend parity  — DONE (X)
 
 - [x] Platform picker using `/x/platforms/` — renders the backend's platform
-      name, not a hardcoded X/TikTok label
+      name, not a hardcoded label
 - [x] Real connect/disconnect UI for every offered platform
 - [x] Campaign create screen (`/brand/create`, brand + staff)
 - [x] Post status and rejection reasons surfaced to creators
 - [x] X-only copy removed (home, metadata, `how-it-works`, and the dead X
       connect/disconnect helpers)
 
-**Done when:** a creator can do everything without a developer present. — met on
-X; TikTok parity follows its credentials (Stage 2).
+**Done when:** a creator can do everything without a developer present. — met.
 
 ## Stage 8 — Operations
 

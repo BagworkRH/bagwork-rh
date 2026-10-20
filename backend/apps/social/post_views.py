@@ -67,10 +67,11 @@ def post_detail(request, pk):
 def _submission_payload(data):
     """Build the provider payload for a submitted post.
 
-    A post's identity is (platform, external_post_id). X and TikTok both issue
-    numeric ids, so the platform must be part of the request or a legitimate
-    post would be rejected as a duplicate of an unrelated one. Returns an error
-    Response when the platform is unknown or the post id is missing.
+    A post's identity is (platform, external_post_id). Networks hand out numeric
+    ids that collide across sites, so the platform must be part of the request
+    or a legitimate post would be rejected as a duplicate of an unrelated one.
+    Returns an error Response when the platform is unknown or the post id is
+    missing.
     """
     platform = data.get("platform", SocialPlatform.X)
     if platform not in dict(SocialPlatform.choices):

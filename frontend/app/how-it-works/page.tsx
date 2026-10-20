@@ -16,9 +16,9 @@ export default function HowItWorksPage() {
             <code className="wallet-chip">SELLER-7K4M2P</code>).
           </li>
           <li>
-            <strong>Connect your social accounts</strong> — link X or TikTok
-            through the official OAuth flow. Only the read permissions we
-            actually need are requested, and we never post on your behalf.
+            <strong>Connect your social account</strong> — link X through the
+            official OAuth flow. Only the read permissions we actually need are
+            requested, and we never post on your behalf.
           </li>
           <li>
             <strong>Connect a wallet</strong> — link an EVM wallet and prove
