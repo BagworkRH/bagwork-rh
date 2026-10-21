@@ -30,7 +30,11 @@ echo "==> dumping ${DB_NAME} (keeping ${KEEP} days)"
 $COMPOSE exec -T db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$OUT_FILE"
 
 echo "==> verifying the archive is readable"
-$COMPOSE exec -T db pg_restore --list - < "$OUT_FILE" > /dev/null
+# No `-` argument: unlike psql, pg_restore does not accept `-` for stdin — it
+# reads standard input only when the archive argument is omitted entirely.
+# Passing `-` made this line fail with "could not open input file", so every
+# backup reported a verification error it had not actually found.
+$COMPOSE exec -T db pg_restore --list < "$OUT_FILE" > /dev/null
 echo "    ok: $(du -h "$OUT_FILE" | cut -f1)"
 
 echo "==> pruning backups older than ${KEEP} days"
