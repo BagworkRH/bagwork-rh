@@ -1,20 +1,32 @@
+import Link from "next/link";
+
 export const metadata = { title: "Help — bagworkRH" };
 
-const TOPICS = [
+type Topic = {
+  id: string;
+  title: string;
+  body: string;
+  /** Where the full text lives, when this entry is only a summary. */
+  href?: string;
+};
+
+const TOPICS: Topic[] = [
   {
     id: "terms",
     title: "Terms of Service",
-    body: "Use of the platform is subject to the campaign rules and applicable token reward terms. Rewards are not securities and nothing on this site is financial advice.",
+    body: "Use of the platform is subject to the campaign rules and applicable token reward terms. Rewards are not securities and nothing on this site is financial advice. The full text is on the Terms of Service page.",
+    href: "/terms",
   },
   {
     id: "privacy",
     title: "Privacy Policy",
-    body: "We collect only the data needed to run campaigns: your account, linked X identity, wallet addresses, and tracked post metrics. OAuth credentials are encrypted at rest and never logged.",
+    body: "We collect only the data needed to run campaigns: your account, linked social identity, wallet addresses, and tracked post metrics. Credentials are encrypted at rest and never logged. The full text is on the Privacy Policy page.",
+    href: "/privacy",
   },
   {
     id: "disclosure",
     title: "Paid Partnership Disclosure",
-    body: "Sellers must disclose paid promotion where required by X or applicable law. Follow each campaign's disclosure guidance before posting.",
+    body: "Sellers must disclose paid promotion where required by the platform or applicable law. Follow each campaign's disclosure guidance before posting.",
   },
   {
     id: "report",
@@ -34,6 +46,11 @@ export default function HelpPage() {
           <details key={topic.id} id={topic.id}>
             <summary>{topic.title}</summary>
             <p>{topic.body}</p>
+            {topic.href ? (
+              <p>
+                <Link href={topic.href}>Read the full text</Link>
+              </p>
+            ) : null}
           </details>
         ))}
 
