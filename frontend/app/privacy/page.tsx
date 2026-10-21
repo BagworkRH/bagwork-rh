@@ -6,9 +6,9 @@ export const metadata = {
     "What bagworkRH collects, why, how long it is kept, and how to have it erased. Read-only access to X, encrypted credentials, no selling of data.",
 };
 
-// Same three deployment facts as the Terms page. Keep them in step.
-const LEGAL_ENTITY = "[LEGAL ENTITY NAME]";
-const CONTACT_EMAIL = "[CONTACT EMAIL]";
+// Same two deployment facts as the Terms page. Keep them in step.
+const LEGAL_ENTITY = "bagworkRH";
+const CONTACT_EMAIL = "bagworkRH@proton.me";
 
 export default function PrivacyPage() {
   return (
@@ -193,7 +193,8 @@ export default function PrivacyPage() {
           Because of the financial records described above, erasure does not
           delete your reward and claim history, and the anonymised account row
           those records point at stays. You can also ask us for a copy of your
-          data, or ask us to correct it. Write to {CONTACT_EMAIL} and we will
+          data, or ask us to correct it. Write to{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> and we will
           respond within the time the law allows; you may also complain to the
           data protection authority in your country.
         </p>
@@ -237,7 +238,8 @@ export default function PrivacyPage() {
             material changes will be announced in the app.
           </li>
           <li>
-            Questions or requests: {CONTACT_EMAIL}. See also our{" "}
+            Questions or requests:{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. See also our{" "}
             <Link href="/terms">Terms of Service</Link>.
           </li>
         </ul>

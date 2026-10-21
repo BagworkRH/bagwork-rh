@@ -273,7 +273,13 @@ rehearsal.
       command (throwaway DB, row-count comparison, non-zero on drift);
       `backup_db.sh --check` verifies the archive; `tests/test_backup_scripts.py`
       guards the scripts and their spot-check tables
-- [ ] Terms of service covering disclosure obligations and reversals
+- [x] Terms of service covering disclosure obligations and reversals —
+      published at `/terms`, with the privacy policy at `/privacy`. The privacy
+      page states what `docs/10` describes as implemented: the 365-day
+      post-content retention measured from campaign end, the disconnect-versus-
+      erase distinction, and why rewards and claims survive an erasure. These
+      are also the terms and privacy URLs X's developer settings require, so
+      this closed a compliance gap as well as the last unchecked box here.
 
 **Done when:** a provider outage pages someone and the runbook is unambiguous.
 

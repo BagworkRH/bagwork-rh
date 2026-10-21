@@ -7,12 +7,14 @@ export const metadata = {
 };
 
 // These three values are the only deployment-specific facts in this document.
-// Fill them in before launch: X's developer settings require this page to be
-// live and to name the operating entity, so an unfilled value here is a
-// compliance problem rather than a cosmetic one.
-const LEGAL_ENTITY = "[LEGAL ENTITY NAME]";
-const CONTACT_EMAIL = "[CONTACT EMAIL]";
-const GOVERNING_LAW = "[JURISDICTION]";
+// X's developer settings require this page to be live and to name the operating
+// entity, so an unfilled value here is a compliance problem rather than a
+// cosmetic one.
+const LEGAL_ENTITY = "bagworkRH";
+const CONTACT_EMAIL = "bagworkRH@proton.me";
+// Chosen for a platform operated from UK infrastructure; change this line if the
+// operating entity is registered in another jurisdiction.
+const GOVERNING_LAW = "England and Wales";
 
 export default function TermsPage() {
   return (
@@ -115,9 +117,9 @@ export default function TermsPage() {
             on them.
           </li>
           <li>
-            If you believe a decision is wrong, contact us at {CONTACT_EMAIL}{" "}
-            with your seller code and the post URL. Every report is reviewed by
-            a person.
+            If you believe a decision is wrong, contact us at{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> with your
+            seller code and the post URL. Every report is reviewed by a person.
           </li>
         </ul>
       </section>
@@ -200,7 +202,8 @@ export default function TermsPage() {
         <p className="muted">
           What we collect, why, how long we keep it, and how to have it erased is
           set out in the <Link href="/privacy">Privacy Policy</Link>. Questions
-          about these terms: {CONTACT_EMAIL}.
+          about these terms:{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
         </p>
       </section>
     </div>
