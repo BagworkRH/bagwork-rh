@@ -155,6 +155,11 @@ REST_FRAMEWORK = {
         # general `user` rate: 1000/hour is a scraping guard, not an anti-abuse
         # control. A creator submitting by hand never approaches this.
         "submit": os.environ.get("THROTTLE_SUBMIT", "20/hour"),
+        # `/api/health/` has its own bucket because it is probed continuously:
+        # the compose healthcheck every 30s (120/hour) plus whatever the uptime
+        # monitor asks for. On the `anon` budget those probes would start
+        # receiving 429s an hour into every deploy and make `web` unhealthy.
+        "health": os.environ.get("THROTTLE_HEALTH", "1200/hour"),
     },
 }
 

@@ -5,9 +5,11 @@ from django.conf import settings
 from django.db import connection
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from config.throttling import HealthThrottle
 
 
 def _database_ok():
@@ -51,9 +53,15 @@ def _heartbeat_status():
 
 
 @api_view(["GET"])
+@throttle_classes([HealthThrottle])
 @permission_classes([AllowAny])
 def health(request):
-    """Report application liveness and dependency connectivity."""
+    """Report application liveness and dependency connectivity.
+
+    Uses the dedicated `health` bucket deliberately: this endpoint is polled by
+    the container healthcheck and by external monitors, so it must not compete
+    with real traffic for the anonymous budget (see `config.throttling`).
+    """
     db_ok = _database_ok()
     redis_state = _redis_ok()
     heartbeat_state = _heartbeat_status()

@@ -19,9 +19,18 @@ classes in `backend/config/throttling.py`:
 | `anon`   | every anonymous request            | 100/hour per IP |
 | `user`   | every authenticated request        | 1000/hour per user |
 | `submit` | `POST /api/v1/social/submissions/` (post intake that leads to a payout) | 20/hour per user |
+| `health` | `/api/health/` (container probe + uptime monitors) | 1200/hour per IP |
+
+`/api/health/` is deliberately *not* on the `anon` budget. The compose
+healthcheck polls it every 30 seconds (120 requests/hour from one address) and an
+uptime monitor adds more, so sharing the 100/hour anonymous bucket meant the
+probe started receiving 429s an hour into every deploy — the `web` container went
+unhealthy and nginx, which waits for it, never started. It keeps a ceiling of its
+own so it is still not free to hammer.
 
 Tune with `THROTTLE_AUTH`, `THROTTLE_ADMIN`, `THROTTLE_WALLET`,
-`THROTTLE_ANON`, `THROTTLE_USER`, `THROTTLE_SUBMIT`. Throttled clients receive HTTP 429.
+`THROTTLE_ANON`, `THROTTLE_USER`, `THROTTLE_SUBMIT`, `THROTTLE_HEALTH`. Throttled
+clients receive HTTP 429.
 
 Each scoped throttle resolves its rate from settings on every request, so a
 `THROTTLE_*` change applies without a restart of the web/worker processes. A

@@ -44,6 +44,9 @@ TINY_SCOPES = {
     "admin": "3/hour",
     "wallet": "3/hour",
     "submit": "3/hour",
+    # `/api/health/` has a dedicated bucket (see `HealthThrottle`); it is kept
+    # generous here so it never interferes with the scope under test.
+    "health": "1000/hour",
 }
 # ...and the inverse: a tiny anonymous baseline with the scopes out of the way.
 TINY_ANON = {**TINY_SCOPES, "anon": "2/hour"}
@@ -106,8 +109,29 @@ class RateLimitingTests(TestCase):
         with throttle_rates(TINY_SCOPES):
             self.assertThrottled("/api/v1/claims/1/authorization/")
 
-    def test_baseline_anon_throttle_applies_everywhere(self):
+    def test_baseline_anon_throttle_applies_to_public_reads(self):
+        # `/api/health/` has its own bucket (asserted below), so the anonymous
+        # baseline is checked against a real public endpoint instead.
         with throttle_rates(TINY_ANON):
+            self.assertThrottled("/api/v1/campaigns/", attempts=2)
+
+    def test_health_probes_do_not_consume_the_anonymous_budget(self):
+        # The compose healthcheck polls /api/health/ every 30s — 120 requests an
+        # hour from one address — and an uptime monitor adds more. On the anon
+        # budget those probes would start getting 429s an hour into every deploy,
+        # the container would turn unhealthy, and nginx (which waits for it)
+        # would never start. So health traffic must not touch that bucket.
+        rates = {**TINY_ANON, "health": "1000/hour"}
+        with throttle_rates(rates):
+            for _ in range(30):
+                resp = self.client.get("/api/health/")
+                self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+
+    def test_health_still_has_its_own_ceiling(self):
+        # Exempting probes from the anonymous budget must not make the endpoint
+        # unmetered: it keeps a limit of its own.
+        rates = {**TINY_ANON, "health": "2/hour"}
+        with throttle_rates(rates):
             self.assertThrottled("/api/health/", attempts=2)
 
     def test_reads_outside_scoped_paths_are_not_blocked(self):

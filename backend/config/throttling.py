@@ -115,3 +115,22 @@ class SubmissionThrottle(PathScopedThrottle):
         if not super().applies_to(request):
             return False
         return request.method == "POST"
+
+
+class HealthThrottle(PathScopedThrottle):
+    """Generous per-IP limit for `/api/health/`.
+
+    Probes are frequent and legitimate, so they cannot share the anonymous
+    baseline: the compose healthcheck calls this endpoint every 30 seconds
+    (120/hour from one address) and an external uptime monitor adds more. On the
+    100/hour `anon` budget the probe starts collecting 429s an hour into every
+    deploy, the `web` container flips to unhealthy, and nginx — which waits for
+    that health — never starts.
+
+    A ceiling is still kept, so the endpoint cannot be used as a free
+    amplification target; it is simply sized for monitors rather than for page
+    views.
+    """
+
+    scope = "health"
+    path_prefixes = ("/api/health/",)
