@@ -63,8 +63,18 @@ services:
       - static:/app/staticfiles
     expose:
       - "8000"
+    # The probe has to present the *public* hostname. `ALLOWED_HOSTS` in
+    # production holds only the real domain, so a bare `localhost` request is
+    # answered 400 DisallowedHost and the container can never report healthy —
+    # which blocks nginx (it waits for `web`), and without nginx there is nothing
+    # to answer the ACME challenge, so the first deploy cannot even get a
+    # certificate. `X-Forwarded-Proto` keeps `SECURE_SSL_REDIRECT` from replying
+    # 301, so the probe checks the view rather than the redirect.
+    #
+    # `$$` escapes compose interpolation: the variable is resolved by the shell
+    # inside the container, from the DOMAIN that env_file already provides.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health/"]
+      test: ["CMD-SHELL", "curl -fsS -H \"Host: $${DOMAIN:-localhost}\" -H \"X-Forwarded-Proto: https\" http://localhost:8000/api/health/"]
       interval: 30s
       timeout: 10s
       start_period: 90s
