@@ -54,6 +54,41 @@ export const NAV_LINKS = [
   { href: "/help", label: "Help" },
 ] as const;
 
+/**
+ * The chain the platform actually pays on: the first entry above, which is
+ * Robinhood Chain testnet. Named so a component never has to hardcode an id —
+ * the connect button previously compared against Sepolia, which told users on
+ * the correct chain that they were on the wrong one.
+ */
+export const LAUNCH_CHAIN = SUPPORTED_NETWORKS[0];
+
+/**
+ * Deep links that open a page inside a mobile wallet's own browser.
+ *
+ * A phone browser has no injected provider, so `window.ethereum` does not exist
+ * there and no amount of retrying will connect. Handing the URL to the wallet
+ * opens it in the wallet's built-in browser, which *does* inject a provider —
+ * so the same connect flow then works unchanged, extension or not.
+ *
+ * WalletConnect (Reown) is the alternative for wallets without a dapp browser;
+ * it needs a project ID and an extra dependency, so it is deliberately not the
+ * first step here.
+ */
+export function walletDeepLinks(url: string): { name: string; href: string }[] {
+  const bare = url.replace(/^https?:\/\//, "");
+  return [
+    { name: "MetaMask", href: `https://metamask.app.link/dapp/${bare}` },
+    {
+      name: "Trust Wallet",
+      href: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(url)}`,
+    },
+    {
+      name: "Coinbase Wallet",
+      href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(url)}`,
+    },
+  ];
+}
+
 /** Shorten an EVM address for display: 0x1234...ABCD */
 export function shortenAddress(address: string, chars = 4): string {
   if (!address) return "";
