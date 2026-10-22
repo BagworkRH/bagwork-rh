@@ -31,6 +31,13 @@ class HeartbeatTests(TestCase):
         self.assertIn("redis", resp.data["checks"])
         self.assertIn("heartbeat", resp.data["checks"])
 
+    def test_health_answers_head_probes(self):
+        # UptimeRobot and load balancers probe with HEAD by default. A 405 here
+        # is reported by the monitor as "down" while the service is healthy, so
+        # the probe must be supported explicitly.
+        resp = self.client.head("/api/health/")
+        self.assertEqual(resp.status_code, 200)
+
 
 class ProductionChecksTests(TestCase):
     def test_insecure_production_config_fails_check(self):

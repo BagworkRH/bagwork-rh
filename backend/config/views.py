@@ -52,11 +52,16 @@ def _heartbeat_status():
     return "stale"
 
 
-@api_view(["GET"])
+@api_view(["GET", "HEAD"])
 @throttle_classes([HealthThrottle])
 @permission_classes([AllowAny])
 def health(request):
     """Report application liveness and dependency connectivity.
+
+    HEAD is accepted alongside GET because that is how the endpoint is actually
+    probed: UptimeRobot defaults to HEAD, and load balancers do the same. Without
+    it the probe receives 405 Method Not Allowed and reports a healthy service as
+    down — a monitoring failure that looks exactly like an outage.
 
     Uses the dedicated `health` bucket deliberately: this endpoint is polled by
     the container healthcheck and by external monitors, so it must not compete
