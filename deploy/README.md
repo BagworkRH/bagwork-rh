@@ -214,7 +214,21 @@ Recreating `web` or `frontend` gives it a new container IP. nginx resolves its
 upstreams through Docker's DNS **per request** (see the `resolver` line in
 `nginx/app.conf.template`), so a redeploy heals itself and needs no reload —
 before that line existed, every backend deploy returned 502 until someone ran
-`nginx -s reload` by hand.
+`nginx -s reload` by hand. Verified by moving `web` from `172.18.0.7` to
+`172.18.0.9` and confirming the site still answered 200 without touching nginx.
+
+> **Editing `nginx/app.conf.template` needs its own step.** The template is a
+> bind mount, and compose decides whether to recreate a container from the
+> *service definition*, not from the contents of mounted files. `up -d` therefore
+> leaves the old nginx running with the old generated config, and the edit looks
+> like it had no effect. After changing that file:
+>
+> ```bash
+> docker compose --env-file .env up -d --force-recreate nginx
+> ```
+>
+> That cost an hour once: the resolver fix above was committed, deployed and
+> silently not loaded, so the 502s it was meant to prevent carried on.
 
 ## 9. Troubleshooting
 
