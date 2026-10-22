@@ -110,6 +110,31 @@ textarea:focus-visible, summary:focus-visible {
 .banner-error { color: var(--danger); }
 .banner-ok { color: var(--accent-2); }
 
+/* Blocking error dialog. Failures the user must act on (signup, wallet
+   connect, campaign join) appear here rather than in a banner at the foot of
+   the page — a failed submit down there reads as nothing having happened. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+.modal {
+  background: var(--bg-elevated);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 460px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.modal h3 { margin: 0 0 8px; }
+.modal-message { color: var(--danger); overflow-wrap: anywhere; margin: 0 0 16px; }
+
 /* Buttons — white pill primary with a top inner highlight, quiet outlined
    secondary. Mirrors the YAP button treatment. */
 .btn {

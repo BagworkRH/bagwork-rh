@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import ErrorModal from "@/components/ErrorModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { apiRequest } from "@/lib/api";
@@ -29,7 +30,7 @@ type PlatformChoice = { id: SocialPlatform; name: string };
  */
 export default function OnboardPage() {
   const { user, loading, register, login, loadDashboard } = useAuth();
-  const { connection, connect, error: walletError } = useWallet();
+  const { connection, connect, error: walletError, clearError } = useWallet();
   const [step, setStep] = useState<Step>(user ? "x" : "account");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -390,7 +391,18 @@ export default function OnboardPage() {
         </div>
       </div>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {/* Failures during signup, wallet connect and platform connect appear as a
+          modal. They used to be a banner at the foot of this long page, where a
+          failed submit looked like the click had done nothing. */}
+      <ErrorModal
+        message={error ?? platformError ?? walletError}
+        title={error ? "Could not create your account" : "That did not work"}
+        onClose={() => {
+          setError(null);
+          setPlatformError(null);
+          clearError();
+        }}
+      />
     </div>
   );
 }
