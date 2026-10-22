@@ -210,6 +210,12 @@ cd deploy && docker compose --env-file .env up -d --build
 Docker rebuilds only what changed, and migrations run on web startup. If you
 changed `PUBLIC_URL`, the frontend rebuild is what makes it take effect.
 
+Recreating `web` or `frontend` gives it a new container IP. nginx resolves its
+upstreams through Docker's DNS **per request** (see the `resolver` line in
+`nginx/app.conf.template`), so a redeploy heals itself and needs no reload —
+before that line existed, every backend deploy returned 502 until someone ran
+`nginx -s reload` by hand.
+
 ## 9. Troubleshooting
 
 | Symptom | Cause |

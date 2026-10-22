@@ -10,13 +10,18 @@
 # ($host, $scheme, $request_uri) are untouched — envsubst is only given the
 # container's environment-variable names.
 
-upstream django {
-    server web:8000;
-}
+# Docker's embedded DNS server. Without an explicit `resolver`, nginx resolves
+# the upstream hostnames once at startup and keeps those addresses for the life
+# of the process — so recreating `web` or `frontend` (which every
+# `docker compose up -d --build` does) leaves nginx proxying to an address that
+# no longer exists, and every request answers 502 until someone reloads it.
+# Resolving per request, with a short TTL, makes a redeploy self-healing.
+resolver 127.0.0.11 valid=10s ipv6=off;
 
-upstream nextjs {
-    server frontend:3000;
-}
+# No `upstream` blocks on purpose: a named upstream is resolved once at startup,
+# which is the bug described above. A variable in `proxy_pass` is resolved
+# through the resolver at request time instead. The URI is passed through
+# unchanged, exactly as `proxy_pass http://django` would.
 
 server {
     listen 80;
@@ -38,6 +43,11 @@ server {
     listen [::]:443 ssl;
     http2 on;
     server_name ${DOMAIN};
+
+    # Resolved per request through the resolver above, so a redeploy cannot
+    # leave nginx pointing at a container IP that no longer exists.
+    set $django_upstream http://web:8000;
+    set $nextjs_upstream http://frontend:3000;
 
     ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
@@ -63,7 +73,7 @@ server {
 
     # Django: the versioned API, the health probe and the admin.
     location /api/ {
-        proxy_pass http://django;
+        proxy_pass $django_upstream;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -74,7 +84,7 @@ server {
     }
 
     location /admin/ {
-        proxy_pass http://django;
+        proxy_pass $django_upstream;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -83,7 +93,7 @@ server {
 
     # Everything else is the Next.js app.
     location / {
-        proxy_pass http://nextjs;
+        proxy_pass $nextjs_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
