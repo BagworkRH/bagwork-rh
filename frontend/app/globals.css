@@ -27,6 +27,41 @@
 
 * { box-sizing: border-box; }
 
+/* An unbroken string must never be able to push its box wider than the screen:
+   wallet addresses, transaction hashes and token symbols are long and contain no
+   spaces. Applied to the elements that actually carry them rather than to
+   everything, so ordinary prose still wraps at word boundaries. */
+code, pre, .wallet-chip, .hash { overflow-wrap: anywhere; }
+
+img, svg, video, canvas { max-width: 100%; }
+
+/* The header is sticky, so an in-page anchor (e.g. /help#privacy) would
+   otherwise land underneath it. */
+[id] { scroll-margin-top: 84px; }
+
+/* Data tables. The dashboard post list is the only one; on phones it becomes a
+   stacked card list (see .table-cards below) rather than a scrolling strip. */
+table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: var(--hairline); vertical-align: top; }
+th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.table-cards { overflow-x: auto; }
+
+/* Respect the OS "reduce motion" setting instead of animating regardless. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -36,6 +71,9 @@ html, body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Stop iOS inflating body text in landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 a { color: var(--text); text-decoration: none; }
 a:hover { text-decoration: none; }
@@ -47,7 +85,14 @@ textarea:focus-visible, summary:focus-visible {
 /* Money figures: monospace + tabular so columns of numbers line up. */
 .num, .tabular { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .money { color: var(--accent-2); }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  /* Fluid gutter — 16px on a 320px phone, 24px on desktop — that also yields to
+     the safe-area insets when the browser draws under a notch. */
+  padding-left: max(clamp(16px, 4vw, 24px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4vw, 24px), env(safe-area-inset-right));
+}
 .main { min-height: 60vh; }
 
 /* Header */
@@ -58,14 +103,21 @@ textarea:focus-visible, summary:focus-visible {
   position: sticky;
   top: 0;
   z-index: 40;
+  /* Draw under the status bar without putting the bar's contents under it. */
+  padding-top: env(safe-area-inset-top);
 }
 .header-inner {
   display: flex;
   align-items: center;
-  gap: 24px;
-  height: 64px;
-  padding-top: 0;
-  padding-bottom: 0;
+  gap: clamp(8px, 2vw, 24px);
+  /* `min-height`, not `height`: on a 320px screen the logo, wallet chip and
+     actions cannot share one line, and a fixed height made them overflow
+     sideways rather than wrap. */
+  min-height: 64px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 /* bagworkRH logo ------------------------------------------------------- */
 .brand-logo {
@@ -101,10 +153,14 @@ textarea:focus-visible, summary:focus-visible {
   border: var(--hairline);
   color: var(--text);
   border-radius: 8px;
-  width: 36px;
-  height: 36px;
+  /* 44px, not 36px: this is the only way into the navigation on a phone, so it
+     has to meet the touch-target minimum. */
+  width: 44px;
+  height: 44px;
   place-items: center;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .banner { padding: 8px 16px; font-size: 0.9rem; }
 .banner-error { color: var(--danger); }
@@ -120,7 +176,10 @@ textarea:focus-visible, summary:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  /* Clear of the notch and the home indicator, and of the virtual keyboard:
+     `dvh` measures the visible viewport, not the layout viewport. */
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   z-index: 100;
 }
 .modal {
@@ -129,8 +188,13 @@ textarea:focus-visible, summary:focus-visible {
   border-radius: var(--radius);
   width: 100%;
   max-width: 460px;
-  padding: 20px;
+  padding: clamp(16px, 4vw, 24px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  /* A long message scrolls inside the dialog instead of pushing its buttons off
+     the bottom of a short screen. */
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal h3 { margin: 0 0 8px; }
 .modal-message { color: var(--danger); overflow-wrap: anywhere; margin: 0 0 16px; }
@@ -145,11 +209,18 @@ textarea:focus-visible, summary:focus-visible {
   border-radius: 9999px;
   border: 1px solid transparent;
   padding: 12px 28px;
+  /* 46px tall: comfortably past the 44px minimum touch target, and the same
+     height for every variant so rows of buttons line up. */
+  min-height: 46px;
+  max-width: 100%;
   cursor: pointer;
   font-size: 0.9375rem;
   font-weight: 500;
   white-space: nowrap;
   text-decoration: none;
+  /* Removes the 300ms tap delay and the grey flash on touch devices. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .btn:hover { text-decoration: none; }
@@ -171,8 +242,15 @@ textarea:focus-visible, summary:focus-visible {
 .btn-outline:hover { border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.04); }
 .btn-ghost { background: transparent; color: var(--muted); }
 .btn-ghost:hover { color: var(--text); }
-.btn-sm { padding: 8px 16px; font-size: 0.8125rem; }
-.btn-lg { padding: 12px 28px; font-size: 0.9375rem; }
+/* Small buttons still have to be tappable: the old 8px/16px padding made them
+   ~35px tall, which is under the 44px guideline. */
+.btn-sm { padding: 10px 16px; font-size: 0.8125rem; min-height: 44px; }
+.btn-lg { padding: 14px 32px; font-size: 1rem; }
+.btn-block { width: 100%; }
+
+/* A group of actions that becomes a full-width stack on a phone, so the
+   primary control is easy to reach and nothing is clipped by a narrow card. */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 .wallet-chip {
   font-family: var(--font-mono);
@@ -182,6 +260,15 @@ textarea:focus-visible, summary:focus-visible {
   color: var(--text);
   padding: 6px 12px;
   border-radius: 999px;
+  /* An address or seller code must not stretch the header or a card; it
+     truncates with an ellipsis instead, and the full value stays available via
+     the element's title attribute where one is set. */
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 /* Campaigns a seller has joined, listed on the dashboard. */
@@ -195,12 +282,15 @@ textarea:focus-visible, summary:focus-visible {
   border: var(--hairline);
   border-radius: var(--radius);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  padding: 24px;
+  padding: clamp(16px, 4vw, 24px);
+  /* Long unbroken values inside a card (addresses, hashes) wrap instead of
+     stretching the card past the viewport. */
+  overflow-wrap: anywhere;
 }
 /* Hero: left-aligned headline block, the YAP landing rhythm. */
-.hero { padding: 64px 0 48px; }
+.hero { padding: clamp(32px, 8vw, 64px) 0 clamp(24px, 6vw, 48px); }
 .hero h1 {
-  font-size: clamp(2.25rem, 5.5vw, 3.75rem);
+  font-size: clamp(2rem, 5.5vw, 3.75rem);
   line-height: 1.05;
   letter-spacing: -0.035em;
   font-weight: 600;
@@ -211,36 +301,41 @@ textarea:focus-visible, summary:focus-visible {
   max-width: 640px;
   margin: 0 0 32px;
   color: var(--muted);
-  font-size: 1.125rem;
+  font-size: clamp(1rem, 2.4vw, 1.125rem);
   line-height: 1.6;
 }
 .hero-ctas { display: flex; gap: 8px; flex-wrap: wrap; }
-.section { padding: 48px 0; }
+.section { padding: clamp(28px, 6vw, 48px) 0; }
 .section h2 {
   margin-top: 0;
-  font-size: 1.5rem;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+/* `min(280px, 100%)` rather than a bare 280px floor: a hard floor wider than the
+   content box (272px inside a 320px phone) makes the track overflow its
+   container, which is a page-level horizontal scrollbar rather than a squashed
+   card. */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 
 /* Stats */
-.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 24px 0; }
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 16px; margin: 24px 0; }
 .stat-box {
   background: var(--bg-elevated);
   border: var(--hairline);
   border-radius: var(--radius);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  padding: 20px;
+  padding: clamp(14px, 3.5vw, 20px);
 }
 .stat-box .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 5.5vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 .stat-box .muted { font-size: 0.875rem; }
 /* Provenance note under the live figures. */
@@ -301,6 +396,8 @@ textarea:focus-visible, summary:focus-visible {
   border: var(--hairline);
   border-radius: 8px;
   padding: 10px 12px;
+  /* Same touch-target reasoning as the buttons. */
+  min-height: 44px;
   font-size: 0.9375rem;
   font-family: inherit;
 }
@@ -349,9 +446,9 @@ textarea:focus-visible, summary:focus-visible {
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 32px;
-  padding-top: 48px;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: clamp(20px, 4vw, 32px);
+  padding-top: clamp(28px, 5vw, 48px);
   padding-bottom: 24px;
 }
 .footer-grid h4 { margin: 0 0 12px; font-size: 0.875rem; font-weight: 600; }
@@ -362,24 +459,103 @@ textarea:focus-visible, summary:focus-visible {
 .footer-legal {
   border-top: var(--hairline);
   padding-top: 20px;
-  padding-bottom: 20px;
+  /* Keep the last line clear of the home indicator. */
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
   font-size: 0.8125rem;
 }
 
-/* Responsive */
+/* Responsive. Phones first, then the wider breakpoints. */
+
+/* Phones and small tablets: the desktop nav becomes a drawer. */
 @media (max-width: 760px) {
   .nav { display: none; }
   .nav-open {
     display: flex;
     flex-direction: column;
     position: absolute;
-    top: 64px;
+    /* `100%` of the header, not a hard-coded 64px: the header wraps to two rows
+       on a narrow screen, and a fixed offset put the drawer on top of the bar it
+       hangs from. */
+    top: 100%;
     left: 0;
     right: 0;
     background: var(--bg-elevated);
     border-bottom: var(--hairline);
-    padding: 12px 24px;
+    padding: 8px max(16px, env(safe-area-inset-left)) 12px;
+    box-shadow: 0 24px 40px -24px rgba(0, 0, 0, 0.9);
+    max-height: 70dvh;
+    overflow-y: auto;
+  }
+  /* Rows a thumb can actually hit, rather than 8px-tall links. */
+  .nav-open a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 10px 8px;
+    font-size: 0.9375rem;
   }
   .menu-toggle { display: grid; }
   .hero h1 { max-width: none; }
+  .stepper .step { padding-left: 38px; }
+}
+
+/* Data tables become stacked cards. Five columns on a 360px screen is a
+   horizontal scroll; repeating the column name per row keeps the context that
+   simply hiding the header row would lose. */
+@media (max-width: 640px) {
+  .table-cards { overflow-x: visible; }
+  .table-cards table,
+  .table-cards thead,
+  .table-cards tbody,
+  .table-cards tr,
+  .table-cards th,
+  .table-cards td { display: block; }
+  .table-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .table-cards tr {
+    border: var(--hairline);
+    border-radius: var(--radius);
+    background: var(--bg);
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .table-cards td {
+    border: none;
+    padding: 6px 0;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .table-cards td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.75rem;
+    flex: none;
+  }
+  .table-cards td:last-child { padding-bottom: 0; }
+}
+
+/* Small phones — 320px to 430px, the tightest layout the product must fit. */
+@media (max-width: 480px) {
+  /* A nowrap label such as "Add / switch to Robinhood Chain Testnet" is wider
+     than the card it sits in, so it wraps; and action groups stack so the
+     primary control is full width and thumb-reachable. */
+  .btn { white-space: normal; text-align: center; }
+  .actions > .btn,
+  .actions > a.btn,
+  .hero-ctas > .btn,
+  .hero-ctas > a.btn { flex: 1 1 100%; }
+  /* iOS Safari zooms the page when a field smaller than 16px takes focus, which
+     leaves the layout panned and the submit button off-screen. */
+  .field input,
+  .field textarea,
+  .field select { font-size: 16px; }
+  .stats-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .footer-grid { grid-template-columns: 1fr; }
 }

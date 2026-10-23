@@ -71,7 +71,7 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
         </div>
       </dl>
 
-      <div className="row">
+      <div className="actions">
         <Link href={`/campaigns/${campaign.slug}`} className="btn btn-outline btn-sm">
           Details
         </Link>

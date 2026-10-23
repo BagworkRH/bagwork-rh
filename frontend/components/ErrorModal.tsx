@@ -43,7 +43,7 @@ export default function ErrorModal({
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <h3 id="error-modal-title">{title}</h3>
         <p className="modal-message">{message}</p>
-        <div className="row">
+        <div className="actions">
           <button className="btn btn-primary" onClick={onClose} autoFocus>
             Close
           </button>

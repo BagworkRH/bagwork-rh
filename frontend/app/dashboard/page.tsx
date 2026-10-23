@@ -50,18 +50,18 @@ function PostRow({ post }: { post: SocialPost }) {
 
   return (
     <tr>
-      <td>
+      <td data-label="Post">
         <a href={post.post_url} target="_blank" rel="noopener noreferrer">
           {post.platform} · {post.external_post_id.slice(-8)}
         </a>
       </td>
-      <td>{post.campaign ?? <span className="muted">—</span>}</td>
-      <td>
+      <td data-label="Campaign">{post.campaign ?? <span className="muted">—</span>}</td>
+      <td data-label="Status">
         <span className={`badge ${badgeClass}`}>
           {statusLabel(post.verification_status)}
         </span>
       </td>
-      <td>
+      <td data-label="Why">
         {post.rejection_reason ? (
           <span className="muted">{post.rejection_reason}</span>
         ) : inFlight ? (
@@ -70,7 +70,9 @@ function PostRow({ post }: { post: SocialPost }) {
           <span className="muted">—</span>
         )}
       </td>
-      <td className="money">{post.total_engagement}</td>
+      <td data-label="Engagement" className="money">
+        {post.total_engagement}
+      </td>
     </tr>
   );
 }
@@ -218,7 +220,10 @@ export default function DashboardPage() {
           </p>
         )}
         {postsState === "ready" && posts.length > 0 && (
-          <div style={{ overflowX: "auto" }}>
+          // On phones this becomes a card per post; each cell carries its column
+          // name in `data-label` so the header row can be hidden without losing
+          // which value is which.
+          <div className="table-cards">
             <table>
               <thead>
                 <tr>

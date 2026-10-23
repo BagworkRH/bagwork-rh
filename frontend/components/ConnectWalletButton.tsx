@@ -120,7 +120,9 @@ export default function ConnectWalletButton({ onVerified }: { onVerified?: () =>
         </p>
       )}
 
-      <div className="row">
+      {/* `.actions` stacks these full width on a phone, so the primary button is
+          reachable with a thumb and the longer label has room to wrap. */}
+      <div className="actions">
         {providerReady && (
           <button
             className="btn btn-primary"
@@ -135,7 +137,7 @@ export default function ConnectWalletButton({ onVerified }: { onVerified?: () =>
             className="btn btn-outline btn-sm"
             onClick={() => void ensureNetwork(LAUNCH_CHAIN.chainId)}
           >
-            Add / switch to {LAUNCH_CHAIN.name}
+            Switch network
           </button>
         )}
       </div>
@@ -176,7 +178,7 @@ function NoProviderHint({ mobile }: { mobile: boolean }) {
         A phone browser cannot run a wallet extension, so open this page inside your wallet app
         and connect from there:
       </p>
-      <div className="row">
+      <div className="actions">
         {href &&
           walletDeepLinks(href).map((link) => (
             <a
