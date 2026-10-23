@@ -159,3 +159,59 @@ dedicated tool (k6 / Locust) hitting the full authenticated workflows
    ```
 5. **Post-incident** — write an audit-log entry (see `apps.audit`) noting what
    happened, who acted, and the resolution.
+
+## 6. Staff console (`/ops`)
+
+The back-office lives inside the product at **`https://<domain>/ops`**, not at
+`/admin` — nginx routes `/admin/` to Django, so a page there would never be
+reached. Both surfaces exist and they do different jobs:
+
+| Surface | Use it for |
+| --- | --- |
+| `/ops` (Next.js) | Day-to-day review work: sellers, campaigns, posts, rewards, claims, risk |
+| `/admin/` (Django) | Model-level edits with no purpose-built screen: token allowlist, `PlatformControl` pause switch, raw rows |
+
+### Access
+
+Sign in with a normal email/password as a user whose `is_staff` is true; an
+**Ops** link then appears in the header. The route guard in
+`frontend/app/ops/layout.tsx` is cosmetic only — every endpoint it calls is
+`IsAdminUser` on the server, so hiding the UI is not what protects the data.
+
+Grant access with:
+
+```bash
+python manage.py shell -c "from apps.accounts.models import User; u=User.objects.get(email='you@example.com'); u.is_staff=True; u.save()"
+```
+
+### Tabs
+
+| Tab | Endpoint | Actions available |
+| --- | --- | --- |
+| Overview | `GET /api/v1/admin/overview/` | none (read-only dashboard) |
+| Sellers | `GET /api/v1/admin/sellers/` | suspend / activate (`POST …/<id>/status/`) |
+| Campaigns | `GET /api/v1/admin/campaigns/` | set status ACTIVE/PAUSED/ENDED/CANCELLED |
+| Posts | `GET /api/v1/admin/posts/` | approve, or reject with a Spec 03 failure state |
+| Rewards | `GET /api/v1/admin/rewards/` | approve → release (makes it claimable) → reverse |
+| Claims | `GET /api/v1/admin/claims/` | mark failed with a reason |
+| Risk | `GET /api/v1/admin/risk/` | dismiss / confirm / take into review, re-run the scan |
+| Audit | `GET /api/v1/admin/audit-logs/` | none (append-only, read-only) |
+| Settings | `GET /api/v1/admin/settings/` | none (reports *configured*, never secret values) |
+
+Every action opens a confirmation dialog and records a reason in the audit
+trail. Four distinctions are deliberate and worth knowing before you press a
+button:
+
+- **Suspend** stops a creator joining campaigns and claiming. It never deletes
+  or rewrites rewards, claims or ledger entries.
+- **Approve a post** marks it VERIFIED. It pays nothing — the reward engine
+  calculates separately.
+- **Release a reward** (APPROVED → AVAILABLE) is the step that makes money
+  claimable, so it is a separate action from approving.
+- **Mark a claim failed** does not burn the reward; the creator can claim again.
+
+### Pausing the platform
+
+`claiming_paused` has no button here on purpose. Set it in Django admin
+(`PlatformControl`), which is also where the token allowlist is edited. The
+Settings tab reports the current state so you can confirm it from `/ops`.

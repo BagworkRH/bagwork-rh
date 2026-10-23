@@ -73,9 +73,16 @@ export default function Header() {
           )}
 
           {user ? (
-            <button className="btn btn-ghost btn-sm" onClick={() => void logout()}>
-              Log out
-            </button>
+            <>
+              {user.is_staff ? (
+                <Link href="/ops" className="btn btn-outline btn-sm">
+                  Ops
+                </Link>
+              ) : null}
+              <button className="btn btn-ghost btn-sm" onClick={() => void logout()}>
+                Log out
+              </button>
+            </>
           ) : (
             <Link href="/dashboard" className="btn btn-primary btn-sm">
               Onboard

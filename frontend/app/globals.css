@@ -445,10 +445,17 @@ textarea:focus-visible, summary:focus-visible {
   border-color: rgba(228, 87, 46, 0.4);
   color: var(--accent);
 }
+/* Used by the ops console for high-severity risk flags and paused states. */
+.badge-danger {
+  background: rgba(234, 115, 129, 0.12);
+  border-color: rgba(234, 115, 129, 0.4);
+  color: var(--danger);
+}
 
 /* Forms */
 .field { display: block; margin-bottom: 16px; }
-.field label {
+.field label,
+.field > span {
   display: block;
   margin-bottom: 6px;
   font-size: 0.75rem;
@@ -537,6 +544,93 @@ textarea:focus-visible, summary:focus-visible {
   /* Keep the last line clear of the home indicator. */
   padding-bottom: max(20px, env(safe-area-inset-bottom));
   font-size: 0.8125rem;
+}
+
+/* Staff console (/ops) ---------------------------------------------------- */
+
+/* Section tabs. Scroll horizontally rather than wrapping awkwardly on a phone,
+   and stay tappable. */
+.ops-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 20px;
+  padding-bottom: 8px;
+  border-bottom: var(--hairline);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ops-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.ops-tab:hover { color: var(--text); background: rgba(241, 236, 225, 0.06); }
+.ops-tab-active { color: #151412; background: var(--accent); }
+
+/* Filter bar above a list. */
+.ops-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.ops-toolbar .field { margin-bottom: 0; flex: 1 1 180px; min-width: 0; }
+
+/* Headline figures on the overview. */
+.ops-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.ops-stat {
+  background: var(--bg-elevated);
+  border: var(--hairline);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.ops-stat .k {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.ops-stat .v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* Row actions. */
+.ops-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+  --shadow: var(--danger);
+}
+.btn-danger:hover { background: rgba(234, 115, 129, 0.1); }
+
+/* Pager under a list. */
+.ops-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
 }
 
 /* Responsive. Phones first, then the wider breakpoints. */
