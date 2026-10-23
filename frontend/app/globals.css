@@ -1,28 +1,40 @@
-/* bagworkRH global styles — dark, high-contrast UI.
-   Palette and surface treatment follow the YAP reference design: near-black
-   paper, a single elevated "sheet" surface, hairline white borders, and a
-   green "money" accent reserved for payout/earnings figures. */
+/* bagworkRH global styles — dark UI.
+   Palette and type system follow bagworkpro.xyz, arranged for a dark surface:
+   their own dark variant is `.on-dark { background: var(--color-char); color:
+   var(--color-paper) }`, so the surfaces below are their `ink`/`char`/`char-2`
+   and the text is their `paper`, rather than an invented dark theme. */
 :root {
-  /* Surfaces */
-  --bg: #050505;            /* paper   */
-  --bg-elevated: #101010;   /* sheet   */
-  --field-bg: #181818;      /* inputs  */
-  --border: #222222;        /* rule    */
+  /* Surfaces — bagworkpro ink / char / char-2 */
+  --bg: #151412;
+  --bg-elevated: #2a2825;
+  --field-bg: #3a3733;
+  --border: rgba(241, 236, 225, 0.14);
 
-  /* Text */
-  --text: #f5f5f5;          /* ink     */
-  --muted: #8a8a8a;         /* ink-soft*/
+  /* Text — bagworkpro paper / dust / graphite */
+  --text: #f1ece1;
+  --muted: #9a948a;
 
-  /* Accents */
-  --accent-2: #4ade80;      /* money   — earnings, payouts, positive */
-  --accent: #facc15;        /* highlight — token/brand accent */
-  --danger: #f87171;        /* stamp   */
+  /* Accents — bagworkpro orange, with their green lightened for legibility on
+     a dark surface (their #3b6a4a is a paper-theme green). Their palette has no
+     error colour, so `danger` stays a distinct rose rather than a second orange
+     that would read as brand. */
+  --accent: #e4572e;        /* brand / token / primary action */
+  --accent-deep: #b94220;   /* pressed, hover-darker */
+  --accent-wash: #f6d8cb;
+  --accent-2: #8ab894;      /* money — earnings, payouts, positive */
+  --danger: #ea7381;        /* stamp */
 
-  --radius: 0.75rem;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  --radius: 4px;
+  --radius-xs: 2px;
+  /* Their type system: Archivo for text, Big Shoulders for display, IBM Plex
+     Mono for figures. The `*-loaded` variables are set by next/font in
+     app/layout.tsx; the fallbacks mirror theirs. */
+  --font-sans: var(--font-sans-loaded), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-loaded), "Arial Narrow", sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, "SFMono-Regular", Menlo,
+    Consolas, monospace;
   /* Hairline border used across cards, inputs and dividers. */
-  --hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --hairline: 1px solid var(--border);
 }
 
 * { box-sizing: border-box; }
@@ -67,7 +79,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -75,11 +87,20 @@ html, body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+
+/* Display face (Big Shoulders) for headings. It is a condensed face, so the
+   negative tracking that suited a wide grotesque would cramp it. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
 a { color: var(--text); text-decoration: none; }
 a:hover { text-decoration: none; }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
 textarea:focus-visible, summary:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 /* Money figures: monospace + tabular so columns of numbers line up. */
@@ -128,9 +149,11 @@ textarea:focus-visible, summary:focus-visible {
 }
 .brand-logo-mark { display: block; flex: none; }
 .brand-logo-text {
-  font-weight: 600;
-  font-size: 1.0625rem;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 .brand-logo-rh { color: var(--text); }
@@ -139,13 +162,16 @@ textarea:focus-visible, summary:focus-visible {
 .nav { display: flex; gap: 4px; flex: 1; }
 .nav a {
   color: var(--muted);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 8px 12px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  /* bagworkpro's nav is tracked uppercase. */
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
-.nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+.nav a:hover { color: var(--text); background: rgba(241, 236, 225, 0.06); }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .menu-toggle {
   display: none;
@@ -199,49 +225,77 @@ textarea:focus-visible, summary:focus-visible {
 .modal h3 { margin: 0 0 8px; }
 .modal-message { color: var(--danger); overflow-wrap: anywhere; margin: 0 0 16px; }
 
-/* Buttons — white pill primary with a top inner highlight, quiet outlined
-   secondary. Mirrors the YAP button treatment. */
+/* Buttons — bagworkpro's treatment: square, 1px outline, a hard offset shadow
+   in the brand orange that grows on hover and collapses on press, so the
+   control reads as a physical key being pushed. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 9999px;
-  border: 1px solid transparent;
-  padding: 12px 28px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--text);
+  padding: 12px 24px;
   /* 46px tall: comfortably past the 44px minimum touch target, and the same
      height for every variant so rows of buttons line up. */
   min-height: 46px;
   max-width: 100%;
   cursor: pointer;
-  font-size: 0.9375rem;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   text-decoration: none;
+  --shadow: var(--accent);
+  box-shadow: 3px 3px 0 var(--shadow);
   /* Removes the 300ms tap delay and the grey flash on touch devices. */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
-.btn:hover { text-decoration: none; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover {
+  text-decoration: none;
+  box-shadow: 4px 4px 0 var(--shadow);
+  transform: translate(-1px, -1px);
+}
+.btn:active {
+  box-shadow: 0 0 0 var(--shadow);
+  transform: translate(3px, 3px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .btn-primary {
-  background: #fff;
-  border-color: #fff;
-  color: #000;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 8px 24px -12px rgba(255, 255, 255, 0.35);
+  background: var(--accent);
+  color: #151412;
+  border-color: var(--accent-deep);
+  --shadow: var(--accent-deep);
 }
-.btn-primary:hover { background: rgba(255, 255, 255, 0.9); }
+.btn-primary:hover { background: var(--accent-deep); }
 .btn-outline {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.15);
   color: var(--text);
+  border-color: var(--text);
 }
-.btn-outline:hover { border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.04); }
-.btn-ghost { background: transparent; color: var(--muted); }
-.btn-ghost:hover { color: var(--text); }
+.btn-outline:hover { background: rgba(241, 236, 225, 0.06); }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+  box-shadow: none;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+.btn-ghost:hover { color: var(--text); background: rgba(241, 236, 225, 0.06); }
 /* Small buttons still have to be tappable: the old 8px/16px padding made them
    ~35px tall, which is under the 44px guideline. */
 .btn-sm { padding: 10px 16px; font-size: 0.8125rem; min-height: 44px; }
@@ -254,12 +308,12 @@ textarea:focus-visible, summary:focus-visible {
 
 .wallet-chip {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   background: var(--field-bg);
   border: var(--hairline);
   color: var(--text);
-  padding: 6px 12px;
-  border-radius: 999px;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
   /* An address or seller code must not stretch the header or a card; it
      truncates with an ellipsis instead, and the full value stays available via
      the element's title attribute where one is set. */
@@ -281,7 +335,6 @@ textarea:focus-visible, summary:focus-visible {
   background: var(--bg-elevated);
   border: var(--hairline);
   border-radius: var(--radius);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   padding: clamp(16px, 4vw, 24px);
   /* Long unbroken values inside a card (addresses, hashes) wrap instead of
      stretching the card past the viewport. */
@@ -290,10 +343,10 @@ textarea:focus-visible, summary:focus-visible {
 /* Hero: left-aligned headline block, the YAP landing rhythm. */
 .hero { padding: clamp(32px, 8vw, 64px) 0 clamp(24px, 6vw, 48px); }
 .hero h1 {
-  font-size: clamp(2rem, 5.5vw, 3.75rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  font-weight: 600;
+  font-size: clamp(2.25rem, 6vw, 4.25rem);
+  line-height: 0.98;
+  letter-spacing: 0.005em;
+  font-weight: 700;
   margin: 0 0 16px;
   max-width: 20ch;
 }
@@ -308,9 +361,9 @@ textarea:focus-visible, summary:focus-visible {
 .section { padding: clamp(28px, 6vw, 48px) 0; }
 .section h2 {
   margin-top: 0;
-  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
 }
 /* `min(280px, 100%)` rather than a bare 280px floor: a hard floor wider than the
    content box (272px inside a 320px phone) makes the track overflow its
@@ -325,7 +378,6 @@ textarea:focus-visible, summary:focus-visible {
   background: var(--bg-elevated);
   border: var(--hairline);
   border-radius: var(--radius);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   padding: clamp(14px, 3.5vw, 20px);
 }
 .stat-box .num {
@@ -354,7 +406,13 @@ textarea:focus-visible, summary:focus-visible {
   padding: 16px 0 0;
   border-top: var(--hairline);
 }
-.stats-list dt { font-size: 0.75rem; color: var(--muted); }
+.stats-list dt {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
 .stats-list dd {
   margin: 4px 0 0;
   font-family: var(--font-mono);
@@ -363,32 +421,42 @@ textarea:focus-visible, summary:focus-visible {
 }
 .row { display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
 
-/* Badges — tinted, hairline-ringed pills (YAP status chip treatment) */
+/* Badges — bagworkpro's status chips: square-ish, tracked uppercase, tinted. */
 .badge {
   display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: rgba(241, 236, 225, 0.06);
   color: var(--muted);
 }
 .badge-ok {
-  background: rgba(74, 222, 128, 0.1);
-  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(138, 184, 148, 0.12);
+  border-color: rgba(138, 184, 148, 0.35);
   color: var(--accent-2);
 }
 .badge-token {
-  background: rgba(250, 204, 21, 0.1);
-  border-color: rgba(250, 204, 21, 0.3);
+  background: rgba(228, 87, 46, 0.14);
+  border-color: rgba(228, 87, 46, 0.4);
   color: var(--accent);
 }
 
 /* Forms */
 .field { display: block; margin-bottom: 16px; }
-.field label { display: block; margin-bottom: 6px; font-size: 0.875rem; color: var(--muted); }
+.field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
 .field input, .field textarea, .field select {
   width: 100%;
   background: var(--field-bg);
@@ -403,7 +471,7 @@ textarea:focus-visible, summary:focus-visible {
 }
 .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
 .field input:focus, .field textarea:focus, .field select:focus {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: var(--accent);
   outline: none;
 }
 .muted { color: var(--muted); }
@@ -451,7 +519,14 @@ textarea:focus-visible, summary:focus-visible {
   padding-top: clamp(28px, 5vw, 48px);
   padding-bottom: 24px;
 }
-.footer-grid h4 { margin: 0 0 12px; font-size: 0.875rem; font-weight: 600; }
+.footer-grid h4 {
+  margin: 0 0 12px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .footer-grid ul { list-style: none; padding: 0; margin: 0; }
 .footer-grid li { margin-bottom: 8px; }
 .footer-grid a { color: var(--muted); font-size: 0.875rem; }
