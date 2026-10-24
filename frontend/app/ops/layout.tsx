@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import OpsSignIn from "@/components/ops/OpsSignIn";
 import { useAuth } from "@/hooks/useAuth";
 
 const TABS = [
@@ -29,7 +30,7 @@ const TABS = [
  * Next.js route there would never be reached in production.
  */
 export default function OpsLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, login, logout } = useAuth();
   const pathname = usePathname();
 
   if (loading) {
@@ -41,19 +42,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return (
-      <div className="container section" style={{ maxWidth: 560 }}>
-        <h1>Staff console</h1>
-        <div className="card">
-          <p>Sign in with a staff account to continue.</p>
-          <div className="actions">
-            <Link href="/dashboard" className="btn btn-primary">
-              Go to sign in
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    return <OpsSignIn onSignIn={login} />;
   }
 
   if (!user.is_staff) {
@@ -62,12 +51,16 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
         <h1>Staff console</h1>
         <div className="card">
           <p className="muted">
-            This area is restricted to staff accounts. {user.email} does not have access.
+            Signed in as {user.email}, but this account is not staff, so the console is not
+            available to it. Ask an administrator to set <code>is_staff</code> on your account.
           </p>
           <div className="actions">
             <Link href="/dashboard" className="btn btn-outline">
-              Back to dashboard
+              Back to your dashboard
             </Link>
+            <button className="btn btn-ghost" onClick={() => void logout()}>
+              Sign in as someone else
+            </button>
           </div>
         </div>
       </div>

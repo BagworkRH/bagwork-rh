@@ -173,10 +173,16 @@ reached. Both surfaces exist and they do different jobs:
 
 ### Access
 
-Sign in with a normal email/password as a user whose `is_staff` is true; an
-**Ops** link then appears in the header. The route guard in
-`frontend/app/ops/layout.tsx` is cosmetic only — every endpoint it calls is
-`IsAdminUser` on the server, so hiding the UI is not what protects the data.
+Go to `/ops` and sign in there with a normal email/password; the form is on the
+console page itself. (It deliberately does **not** send you to
+`/dashboard/onboard`, which is the *creator* onboarding flow — a staff member
+following that link lands in a seller registration form.)
+
+An **Ops** link then appears in the header for as long as that staff session
+lasts. The route guard in `frontend/app/ops/layout.tsx` is cosmetic only — every
+endpoint it calls is `IsAdminUser` on the server, so hiding the UI is not what
+protects the data. A signed-in non-staff account sees an explanation rather than
+a broken screen.
 
 Grant access with:
 
