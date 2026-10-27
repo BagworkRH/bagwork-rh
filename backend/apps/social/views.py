@@ -26,8 +26,13 @@ from .services import disconnect_social_account, link_social_account
 logger = logging.getLogger(__name__)
 
 # OAuth scopes per platform. Platforms differ; the mock accepts anything.
+#
+# `offline.access` is what makes X issue a *refresh* token at all. Without it
+# the access token dies after ~2 hours and nothing can renew it, so discovery,
+# metrics and post facts all stop working for every connected account — the
+# code reads a `refresh_token` that was never granted.
 REQUIRED_SCOPES = {
-    SocialPlatform.X: ["tweet.read", "users.read"],
+    SocialPlatform.X: ["tweet.read", "users.read", "offline.access"],
 }
 
 

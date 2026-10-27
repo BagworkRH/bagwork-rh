@@ -9,8 +9,6 @@ Tasks:
 All provider work goes through the X provider adapter; transient errors use
 exponential backoff retry.
 """
-import json
-
 from celery import shared_task
 from django.utils import timezone
 
@@ -26,23 +24,23 @@ from apps.social.post_services import run_verification
 @shared_task(bind=True, max_retries=5, default_retry_delay=30, autoretry_for=(OSError,))
 def refresh_post_metrics(self, post_id):
     """Refresh metrics for a post via the provider and record a snapshot."""
-    import json  # noqa: PLC0415
-
     from django.utils import timezone  # noqa: PLC0415
 
-    from .crypto_utils import decrypt_secret  # noqa: PLC0415
     from .models import PostMetricSnapshot  # noqa: PLC0415
     from .providers import get_provider  # noqa: PLC0415
+    from .services import with_fresh_token  # noqa: PLC0415
 
     post = SocialPost.objects.get(pk=post_id)
     account = post.account
     if account is None:
         return {"status": "no-x-account", "post": post_id}
 
-    creds = json.loads(
-        decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
+    # Renews first when the stored expiry is close, and retries once on a 401,
+    # so a stale token costs a refresh rather than a lost metrics snapshot.
+    metrics = with_fresh_token(
+        account,
+        lambda token: get_provider(post.platform).get_metrics(token, post.external_post_id),
     )
-    metrics = get_provider(post.platform).get_metrics(creds["access_token"], post.external_post_id)
 
     PostMetricSnapshot.objects.create(
         post=post,
@@ -83,16 +81,14 @@ def refresh_post_facts(self, post_id):
         post.save(update_fields=["originality_evidence", "updated_at"])
         return {"status": "no-connected-account", "post": post_id}
 
-    import json  # noqa: PLC0415
+    from .services import with_fresh_token  # noqa: PLC0415
 
-    from .crypto_utils import decrypt_secret  # noqa: PLC0415
-
-    creds = json.loads(
-        decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
-    )
     provider = get_provider(post.platform, user=None)
     try:
-        raw = provider.get_post(creds["access_token"], post.external_post_id)
+        # A stale token would otherwise look exactly like a missing post.
+        raw = with_fresh_token(
+            account, lambda token: provider.get_post(token, post.external_post_id)
+        )
     except SocialProviderError as exc:
         # The whole point: a provider outage must not silently pass a post
         # through as if it had been confirmed.
@@ -175,9 +171,12 @@ def discover_posts_for_account(account_id, campaign_id):
     from apps.social.models import SocialAccount  # noqa: PLC0415
     from apps.social.post_services import create_post_from_provider  # noqa: PLC0415
     from apps.social.providers import get_provider  # noqa: PLC0415
-    from apps.social.providers.base import SocialProviderError  # noqa: PLC0415
+    from apps.social.providers.base import (  # noqa: PLC0415
+        SocialProviderAuthError,
+        SocialProviderError,
+    )
 
-    from .crypto_utils import decrypt_secret  # noqa: PLC0415
+    from .services import with_fresh_token  # noqa: PLC0415
 
     account = SocialAccount.objects.filter(pk=account_id).first()
     campaign = Campaign.objects.filter(pk=campaign_id).first()
@@ -188,17 +187,21 @@ def discover_posts_for_account(account_id, campaign_id):
     if not account.encrypted_credentials:
         return {"status": "no-credentials", "created": 0}
 
-    creds = json.loads(
-        decrypt_secret(bytes(account.encrypted_credentials), bytes(account.credentials_iv))
-    )
     since = campaign.discovery_watermark(account.platform)
     now = timezone.now()
 
     try:
         provider = get_provider(account.platform)
-        found = provider.discover_posts(
-            creds["access_token"], account.provider_user_id, campaign, since, now
+        found = with_fresh_token(
+            account,
+            lambda token: provider.discover_posts(
+                token, account.provider_user_id, campaign, since, now
+            ),
         )
+    except SocialProviderAuthError as exc:
+        # The token is dead and could not be renewed. The account is now
+        # REAUTH_REQUIRED, so later ticks skip it instead of re-asking X.
+        return {"status": "reauth-required", "created": 0, "detail": str(exc)[:200]}
     except SocialProviderError as exc:
         # Do NOT advance the watermark on failure: the posts we missed must be
         # re-read next tick, or a transient outage silently loses real posts.

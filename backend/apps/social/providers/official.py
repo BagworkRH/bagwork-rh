@@ -6,19 +6,28 @@ with PKCE flow. Credentials always come from environment variables
 """
 import base64
 import hashlib
+from datetime import timedelta
 from datetime import timezone as dt_timezone
 from urllib.parse import urlencode
 
 import requests
 from django.utils import timezone
 
-from .base import SocialProvider, SocialProviderError
+from .base import SocialProvider, SocialProviderAuthError, SocialProviderError
 
 # X's `referenced_tweets[].type` values, confirmed against the live API.
 # `retweeted` is the one that matters: the original code tested for "reposted",
 # which X never returns, so every real retweet was recorded as an original and
 # was therefore payable.
 KNOWN_REFERENCE_TYPES = frozenset({"retweeted", "quoted", "replied_to"})
+
+# One endpoint serves both grants: `authorization_code` on connect and
+# `refresh_token` on renewal.
+TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
+
+# The one status worth treating differently: it means the access token is
+# stale, which a refresh can fix, where anything else is a real failure.
+HTTP_UNAUTHORIZED = 401
 
 
 def _pkce_challenge(verifier: str) -> str:
@@ -50,6 +59,40 @@ def _rfc3339(value) -> str:
         digits = digits.rstrip("0")
         text = f"{head}.{digits}{suffix}" if digits else f"{head}{suffix}"
     return text
+
+
+def _expiry_from(tokens):
+    """When the access token in this response stops working.
+
+    X returns `expires_in` (seconds; ~7200). Recorded so a renewal can happen
+    *before* a poll rather than being discovered as a 401 in the middle of one.
+    Returns None when the provider did not say, which leaves the caller to
+    refresh reactively instead.
+    """
+    expires_in = tokens.get("expires_in")
+    if not expires_in:
+        return None
+    try:
+        return timezone.now() + timedelta(seconds=int(expires_in))
+    except (TypeError, ValueError):
+        return None
+
+
+def _raise_for_status(resp, what):
+    """Turn a failed X response into the error the caller needs.
+
+    A 401 means the access token is stale, which the caller can fix by
+    refreshing and retrying. Anything else is a genuine provider failure that a
+    refresh cannot help, so it must not spend a single-use refresh token. The
+    message stays identical for both, preserving the "… failed: HTTP nnn" text
+    that operators and existing logs already read.
+    """
+    if resp.ok:
+        return
+    message = f"{what} failed: HTTP {resp.status_code}"
+    if resp.status_code == HTTP_UNAUTHORIZED:
+        raise SocialProviderAuthError(message)
+    raise SocialProviderError(message)
 
 
 class OfficialXProvider(SocialProvider):
@@ -104,7 +147,7 @@ class OfficialXProvider(SocialProvider):
             reverse("social:callback", kwargs={"platform": self.platform})
         )
         token_resp = requests.post(
-            "https://api.twitter.com/2/oauth2/token",
+            TOKEN_URL,
             data={
                 "code": code,
                 "grant_type": "authorization_code",
@@ -123,7 +166,52 @@ class OfficialXProvider(SocialProvider):
         account = self.get_account(tokens["access_token"])
         account["access_token"] = tokens["access_token"]
         account["refresh_token"] = tokens.get("refresh_token", "")
+        account["expires_at"] = _expiry_from(tokens)
         return account
+
+    def refresh_access_token(self, refresh_token):
+        """Exchange a refresh token for a new access/refresh pair.
+
+        X rotates the refresh token on every use: the one just spent is dead as
+        soon as this succeeds, so the caller MUST persist the pair that comes
+        back. Losing it locks the account out until a human reconnects, which is
+        why the result is returned rather than swallowed here.
+
+        `offline.access` must have been granted at authorization time for X to
+        issue a refresh token at all — see `REQUIRED_SCOPES` in the connect view.
+        """
+        if not refresh_token:
+            raise SocialProviderAuthError(
+                "No refresh token is stored for this account; it must be reconnected."
+            )
+        client_id, client_secret, _ = self._credentials()
+
+        resp = requests.post(
+            TOKEN_URL,
+            data={
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+                "client_id": client_id,
+            },
+            auth=(client_id, client_secret),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30,
+        )
+        if not resp.ok:
+            # Terminal for this account: the token was rotated away, revoked, or
+            # expired. An auth error (not a plain provider error) so the caller
+            # marks it for reconnection instead of retrying forever.
+            raise SocialProviderAuthError(
+                f"Token refresh failed: HTTP {resp.status_code} (reconnect required)"
+            )
+
+        tokens = resp.json()
+        return {
+            "access_token": tokens["access_token"],
+            # X may omit a new refresh token; the caller then keeps the old one.
+            "refresh_token": tokens.get("refresh_token", ""),
+            "expires_at": _expiry_from(tokens),
+        }
 
     def _headers(self, access_token):
         return {"Authorization": f"Bearer {access_token}"}
@@ -134,8 +222,7 @@ class OfficialXProvider(SocialProvider):
             headers=self._headers(access_token),
             timeout=30,
         )
-        if not resp.ok:
-            raise SocialProviderError(f"Account fetch failed: HTTP {resp.status_code}")
+        _raise_for_status(resp, "Account fetch")
         data = resp.json()["data"]
         return {
             "provider_user_id": data["id"],
@@ -152,8 +239,7 @@ class OfficialXProvider(SocialProvider):
             headers=self._headers(access_token),
             timeout=30,
         )
-        if not resp.ok:
-            raise SocialProviderError(f"Post fetch failed: HTTP {resp.status_code}")
+        _raise_for_status(resp, "Post fetch")
         return resp.json()["data"]
 
     @staticmethod
@@ -206,8 +292,7 @@ class OfficialXProvider(SocialProvider):
             params=params,
             timeout=30,
         )
-        if not resp.ok:
-            raise SocialProviderError(f"Timeline fetch failed: HTTP {resp.status_code}")
+        _raise_for_status(resp, "Timeline fetch")
         return resp.json()
 
     def discover_posts(self, access_token, username, campaign, since, until):

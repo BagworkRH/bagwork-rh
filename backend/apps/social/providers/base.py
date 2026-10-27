@@ -12,6 +12,16 @@ class SocialProviderError(Exception):
     """Raised for provider-level failures (network, rate limit, auth)."""
 
 
+class SocialProviderAuthError(SocialProviderError):
+    """The stored access token is no longer accepted (HTTP 401).
+
+    A subclass rather than a flag, so a caller can tell "refresh and retry" from
+    "the provider is down". The distinction matters: a 401 is recoverable in
+    process, whereas treating an outage as a token problem would spend a
+    single-use refresh token on an error the refresh cannot fix.
+    """
+
+
 class SocialProvider(ABC):
     """Interface every social platform adapter implements.
 

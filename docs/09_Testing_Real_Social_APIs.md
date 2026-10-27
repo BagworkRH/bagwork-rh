@@ -20,7 +20,7 @@ second provider to verify against today.
 | Where | [console.x.com](https://console.x.com) |
 | Cost | pay-per-use credits (no tiers) |
 | Approval | immediate, but *some endpoints need review* |
-| Scopes we use | `tweet.read`, `users.read` |
+| Scopes we use | `tweet.read`, `users.read`, `offline.access` |
 | Effort | ~30 min |
 
 ## 1. X, end to end
@@ -135,7 +135,7 @@ development.
 |---|---|
 | `ModuleNotFoundError: .official` | `SOCIAL_PROVIDER_MODE` is `mock`. |
 | `Timeline fetch failed: HTTP 403` | Token lacks `tweet.read`, or the app is in Read-only mode and hit a restricted endpoint. |
-| `HTTP 401` | Expired or revoked token; re-run the connect flow. |
+| `HTTP 401` | Expired access token. The pipeline renews it automatically and retries once, so this should be transient. If it persists the account is marked `REAUTH_REQUIRED` and must be reconnected: either no refresh token was granted (a connection made before `offline.access` was requested) or X rejected it. |
 | `timeline -> 0 post(s)` | No posts in the window, or account is protected. Post something public. |
 | `referenced_tweets` missing from raw JSON | The field is not requested, or the endpoint ignores it. Stage 1 needs this — check the `tweet.fields` param. |
 

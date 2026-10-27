@@ -12,9 +12,11 @@ verification.
 
 ### Scopes
 
-`tweet.read`, `users.read` — **read only**. No write scopes. We never post,
-reply, like, repost, follow, or DM on a user's behalf. There is no code path
-that writes to X.
+`tweet.read`, `users.read`, `offline.access` — **read only**. No write scopes. We
+never post, reply, like, repost, follow, or DM on a user's behalf. There is no
+code path that writes to X. `offline.access` is not a write scope: it is what
+lets us renew the read token when it expires, so a connected account keeps
+working past the two-hour token lifetime without the creator reconnecting.
 
 ### What we read
 
