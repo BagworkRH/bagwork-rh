@@ -194,7 +194,19 @@ export type PostVerificationStatus =
 
 export type SocialPlatform = "x";
 
-export type SocialAccountStatus = "CONNECTED" | "PENDING" | "ERROR" | "REVOKED";
+/**
+ * `REAUTH_REQUIRED` is set by the server when an access token expired and could
+ * not be renewed — the refresh token was rejected, or the account was connected
+ * before we asked for `offline.access` so it never had one. Only the creator
+ * reconnecting can clear it, which is why it is a status of its own rather than
+ * an error the poller retries forever.
+ */
+export type SocialAccountStatus =
+  | "CONNECTED"
+  | "PENDING"
+  | "ERROR"
+  | "REVOKED"
+  | "REAUTH_REQUIRED";
 
 /**
  * A seller's linked account as returned by `GET /api/v1/x/connections/`.
