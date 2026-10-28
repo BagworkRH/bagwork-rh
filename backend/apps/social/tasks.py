@@ -216,6 +216,13 @@ def discover_posts_for_account(account_id, campaign_id):
         )
         if post is not None:
             created += 1
+            # Hand it to verification immediately. Nothing else calls that task,
+            # so without this a discovered post sits in DISCOVERED forever and
+            # the creator is never paid - which is exactly what "the creator
+            # posts and gets paid with no manual step" is supposed to mean.
+            # Cheap by design: for a discovered post, originality is already
+            # provider-confirmed, so verification makes no further API calls.
+            run_verification_on_post.delay(post.pk)
 
     campaign.set_discovery_watermark(account.platform, now)
     return {"status": "ok", "created": created, "seen": len(found)}

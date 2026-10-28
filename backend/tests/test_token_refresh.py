@@ -328,10 +328,13 @@ class DiscoveryRenewalTests(TestCase):
 
     def _run_discovery(self, provider):
         # get_provider is imported inside the task *and* inside the service, so
-        # both registry lookups have to answer with the same fake.
+        # both registry lookups have to answer with the same fake. Verification
+        # of each new post is queued by discovery, which a unit test has no
+        # broker for, so the dispatch is stubbed here too.
         with (
             mock.patch("apps.social.providers.get_provider", return_value=provider),
             mock.patch("apps.social.services.get_provider", return_value=provider),
+            mock.patch("apps.social.tasks.run_verification_on_post"),
         ):
             return discover_posts_for_account.apply(
                 args=[self.account.pk, self.campaign.pk]

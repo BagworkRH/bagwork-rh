@@ -155,7 +155,13 @@ class DiscoveryPollerTests(TestCase):
             provider.discover_posts = boom
         # get_provider is imported inside the task, so the registry module is
         # the correct patch target.
-        with patch("apps.social.providers.get_provider", return_value=provider):
+        with (
+            patch("apps.social.providers.get_provider", return_value=provider),
+            # Discovery now queues verification of each new post. This class is
+            # about discovery's own output, so the queue is stubbed rather than
+            # left to reach for a broker a unit test does not have.
+            patch("apps.social.tasks.run_verification_on_post"),
+        ):
             return discover_posts_for_account.apply(
                 args=[self.account.pk, self.campaign.pk]
             ).get()

@@ -208,6 +208,15 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.social.tasks.poll_active_campaigns",
         "schedule": timedelta(minutes=5),
     },
+    # Rewards for whatever verified since the last tick. A sweep rather than a
+    # per-post chain because `calculate_pending_rewards` is already a batch task
+    # that skips posts with a live reward, so a missed or repeated tick costs
+    # nothing. Rewards land PENDING: approval is still a human decision, which is
+    # the only step in this pipeline that should be.
+    "calculate-pending-rewards": {
+        "task": "apps.social.tasks.calculate_pending_rewards",
+        "schedule": timedelta(minutes=5),
+    },
     "poll-reward-claimed-events": {
         "task": "apps.blockchain.tasks.process_claim_events",
         "schedule": 120.0,  # every 2 minutes
