@@ -68,7 +68,13 @@ and read back through the real timeline endpoint.
       (live payloads pinned in `ProviderOriginalityMappingTests`)
 - [x] One end-to-end connect -> discover -> verify -> reward, live (2026-10-06)
       — run on a staff campaign, which skips the brand funding gate by design
-- [ ] The same on a brand-funded campaign (needs the funding loop from Stage 6)
+- [x] The same on a brand-funded campaign (2026-10-28)
+      — 5 USDG brand deposit verified on chain, `acme-funding-rehearsal` launched
+      ACTIVE, both creators reconnected with `offline.access` (refresh token now
+      actually issued), 99 real posts discovered, 74 verified / 25 rejected as
+      non-original, 8 rewards of 1 USDG (then the budget cap refused the other
+      66), and 1 USDG claimed on chain to the creator's own wallet:
+      tx `c446cca2bd08f5afe1262b315b305d4d3dc2bf06507c245869f6d974eed11a28`.
 
 **The bug the live run caught.** `normalize_post` decided originality with
 `"reposted" in ref_types`. X never sends that string. So every real retweet was
