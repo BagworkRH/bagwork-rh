@@ -6,6 +6,7 @@ import ErrorModal from "@/components/ErrorModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
 import { apiRequest } from "@/lib/api";
+import { describeOauthError } from "@/lib/labels";
 import {
   connectPlatform,
   disconnectPlatform,
@@ -47,7 +48,12 @@ export default function OnboardPage() {
    * `?connected=` or `?error=`, so the seller sees what happened instead of a
    * silent reload after handing off to the provider.
    */
-  const [oauthNotice, setOauthNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [oauthNotice, setOauthNotice] = useState<{
+    ok: boolean;
+    text: string;
+    detail?: string;
+    platform?: SocialPlatform;
+  } | null>(null);
 
   /**
    * Which platforms this build can connect, and which ones this seller has
@@ -80,11 +86,22 @@ export default function OnboardPage() {
     const connected = params.get("connected");
     const oauthError = params.get("error");
     if (!connected && !oauthError) return;
-    setOauthNotice(
-      connected
-        ? { ok: true, text: `${connected.toUpperCase()} connected.` }
-        : { ok: false, text: `Could not connect: ${oauthError}` }
-    );
+    if (connected) {
+      setOauthNotice({
+        ok: true,
+        text: "Account connected. We will find your posts from now on.",
+      });
+    } else {
+      // The backend sends a code like `invalid_state`, which a creator cannot
+      // act on - it reads as though they did something wrong.
+      const described = describeOauthError(oauthError ?? "");
+      setOauthNotice({
+        ok: false,
+        text: described.text,
+        detail: described.detail,
+        platform: (params.get("platform") as SocialPlatform | null) ?? undefined,
+      });
+    }
     // Drop the query so a refresh does not replay a stale outcome.
     window.history.replaceState({}, "", window.location.pathname);
   }, []);
@@ -224,6 +241,21 @@ export default function OnboardPage() {
       {oauthNotice && (
         <div className={`banner ${oauthNotice.ok ? "banner-ok" : "banner-error"}`}>
           {oauthNotice.text}
+          {!oauthNotice.ok && (
+            <>
+              {" "}
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => void handleConnect(oauthNotice.platform ?? "x")}
+                disabled={platformBusy !== null}
+              >
+                {platformBusy ? "Connecting…" : "Try again"}
+              </button>
+            </>
+          )}
+          {oauthNotice.detail && (
+            <span className="muted"> (code: {oauthNotice.detail})</span>
+          )}
         </div>
       )}
 
@@ -331,20 +363,33 @@ export default function OnboardPage() {
           <div className="card">
             {connection.status === "connected" ? (
               <p>
-                Wallet connected: <strong>{connection.address}</strong> on chain {connection.chainId}.{" "}
-                <span className="badge badge-ok">OK</span>
+                Wallet connected: <strong>{connection.address}</strong>.{" "}
+                <span className="badge badge-ok">Ready to receive payment</span>
               </p>
             ) : (
-              <p className="muted">Connect an EVM wallet. We never ask for your private key.</p>
+              <p className="muted">
+                Rewards are paid to a wallet you control. Add one now, or later —
+                you only need it when you claim, so you can start posting right
+                away.
+              </p>
             )}
-            {connection.status !== "connected" && (
-              <button className="btn btn-primary" onClick={() => void handleConnectWallet()}>
-                Connect wallet
-              </button>
-            )}
-            {connection.status === "connected" && step !== "done" && (
-              <button className="btn btn-primary" onClick={() => setStep("code")}>Continue</button>
-            )}
+            <div className="row">
+              {connection.status !== "connected" && (
+                <button className="btn btn-primary" onClick={() => void handleConnectWallet()}>
+                  Connect wallet
+                </button>
+              )}
+              {connection.status !== "connected" && step !== "done" && (
+                <button className="btn btn-outline" onClick={() => setStep("code")}>
+                  Skip for now
+                </button>
+              )}
+              {connection.status === "connected" && step !== "done" && (
+                <button className="btn btn-primary" onClick={() => setStep("code")}>
+                  Continue
+                </button>
+              )}
+            </div>
           </div>
         </div>
 <div className="step">
@@ -378,10 +423,14 @@ export default function OnboardPage() {
                   Social accounts:{" "}
                   {linked.length > 0
                     ? linked.map((a) => `@${a.username}`).join(", ")
-                    : "none linked"}
+                    : "none linked yet"}
                 </li>
-                <li>Wallet connected</li>
-                <li>Seller code ready: {sellerCode}</li>
+                <li>
+                  {connection.status === "connected"
+                    ? "Wallet ready to receive payment"
+                    : "No wallet yet — add one any time before you claim"}
+                </li>
+                <li>Your code: {sellerCode}</li>
               </ul>
               <Link className="btn btn-primary" href="/dashboard">Go to dashboard</Link>
             </div>

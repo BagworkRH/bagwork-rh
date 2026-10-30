@@ -3,36 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { accountStatus, postStatus, toneClass } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { getMyCampaigns } from "@/services/campaigns";
-import { getMyPosts } from "@/services/social";
-import type { JoinedCampaign, SellerDashboard, SocialPost } from "@/types";
-
-/**
- * Verification statuses still being worked on by the pipeline. Anything else
- * that isn't payable is settled and rejected -- the creator's action is to fix
- * it rather than wait.
- */
-const IN_FLIGHT_STATUSES = new Set([
-  "DISCOVERED",
-  "BASIC_VALIDATION",
-  "CAMPAIGN_MATCH",
-  "DUPLICATE_CHECK",
-  "METRICS_PENDING",
-  "PROVIDER_ERROR",
-]);
-
-/** Statuses that mean the post is payable. */
-const PAYING_STATUSES = new Set([
-  "VERIFIED",
-  "REWARD_CALCULATED",
-  "APPROVED",
-]);
-
-/** Human labels for the enum; underscores make poor reading in a UI. */
-function statusLabel(status: string): string {
-  return status.toLowerCase().replace(/_/g, " ");
-}
+import { getConnections, getMyPosts } from "@/services/social";
+import type {
+  JoinedCampaign,
+  SellerDashboard,
+  SocialAccount,
+  SocialPost,
+} from "@/types";
 
 /**
  * One row of the creator's posts.
@@ -43,29 +23,31 @@ function statusLabel(status: string): string {
  * learns why something failed without asking staff.
  */
 function PostRow({ post }: { post: SocialPost }) {
-  const inFlight = IN_FLIGHT_STATUSES.has(post.verification_status);
-  const settled = !inFlight;
-  const rejected = settled && !PAYING_STATUSES.has(post.verification_status);
-  const badgeClass = rejected ? "" : inFlight ? "badge-token" : "badge-ok";
+  const copy = postStatus(post.verification_status);
+  const published = post.published_at
+    ? new Date(post.published_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      })
+    : null;
 
   return (
     <tr>
       <td data-label="Post">
         <a href={post.post_url} target="_blank" rel="noopener noreferrer">
-          {post.platform} · {post.external_post_id.slice(-8)}
+          View on X
         </a>
+        {published && <span className="muted"> · {published}</span>}
       </td>
       <td data-label="Campaign">{post.campaign ?? <span className="muted">—</span>}</td>
       <td data-label="Status">
-        <span className={`badge ${badgeClass}`}>
-          {statusLabel(post.verification_status)}
-        </span>
+        <span className={toneClass(copy.tone)}>{copy.text}</span>
       </td>
       <td data-label="Why">
-        {post.rejection_reason ? (
-          <span className="muted">{post.rejection_reason}</span>
-        ) : inFlight ? (
-          <span className="muted">Verification in progress.</span>
+        {/* The backend's own reason is more specific than the generic one,
+            so it wins whenever it is present. */}
+        {post.rejection_reason || copy.reason ? (
+          <span className="muted">{post.rejection_reason || copy.reason}</span>
         ) : (
           <span className="muted">—</span>
         )}
@@ -88,6 +70,7 @@ export default function DashboardPage() {
   const [campaignsState, setCampaignsState] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -118,6 +101,16 @@ export default function DashboardPage() {
         setCampaignsState("ready");
       })
       .catch(() => setCampaignsState("error"));
+  }, [user]);
+
+  // A connection that needs renewing is the one failure that quietly stops a
+  // creator earning: the pipeline keeps running and simply finds nothing. It is
+  // read on every dashboard load so it cannot go unnoticed.
+  useEffect(() => {
+    if (!user) return;
+    getConnections()
+      .then((res) => setAccounts(res.connections))
+      .catch(() => setAccounts([]));
   }, [user]);
 
   if (loading) {
@@ -171,10 +164,24 @@ export default function DashboardPage() {
     { label: "Total engagement", value: String(dashboard.total_engagement) },
   ];
 
+  // Accounts whose token died and can no longer be renewed automatically.
+  const staleConnections = accounts.filter(
+    (account) => accountStatus(account.status).needsReconnect
+  );
+
   return (
     <div className="container section">
       <h1>Seller dashboard</h1>
       <p className="muted">@{user.username}</p>
+
+      {staleConnections.length > 0 && (
+        <div className="banner banner-error">
+          We cannot find new posts from{" "}
+          {staleConnections.map((a) => `@${a.username}`).join(", ")} until you
+          reconnect.{" "}
+          <Link href="/dashboard/onboard">Reconnect now</Link>.
+        </div>
+      )}
 
       <div className="stat-strip">
         {cards.map((card) => (
@@ -296,9 +303,29 @@ export default function DashboardPage() {
         </div>
         <div className="card">
           <h3>Social accounts</h3>
-          <p className="muted">
-            Link the platforms you publish on so we can find your posts.
-          </p>
+          {accounts.length === 0 ? (
+            <p className="muted">
+              Link the platforms you publish on so we can find your posts.
+            </p>
+          ) : (
+            <ul>
+              {accounts.map((account) => {
+                const state = accountStatus(account.status);
+                return (
+                  <li
+                    key={`${account.platform}-${account.username}`}
+                    className="row"
+                    style={{ justifyContent: "space-between" }}
+                  >
+                    <span>@{account.username}</span>
+                    <span className={toneClass(state.needsReconnect ? "bad" : "ok")}>
+                      {state.text}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <Link href="/dashboard/onboard" className="btn btn-outline btn-sm">
             Manage connections
           </Link>
