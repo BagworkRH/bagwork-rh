@@ -215,6 +215,47 @@ export type SocialAccountStatus =
  * never serialised to the client, so the only fields exposed are the ones a
  * creator needs to see their own link status.
  */
+/**
+ * The public leaderboard: what creators actually earned, per campaign.
+ *
+ * `earned`/`share`/`deltas`/`series` are null when the creator hid their
+ * earnings - the rank stays, the figure does not. The server enforces that, so
+ * the UI only has to render the absence honestly rather than guess at it.
+ */
+export interface LeaderboardEntry {
+  rank: number;
+  display_name: string;
+  username: string | null;
+  avatar_url: string;
+  rewards: number;
+  hidden: boolean;
+  earned: string | null;
+  share: number | null;
+  delta_7d: string | null;
+  delta_30d: string | null;
+  /** Daily totals, oldest first, for the sparkline. */
+  series: number[];
+}
+
+export interface LeaderboardCampaign {
+  slug: string;
+  name: string;
+  token_symbol: string;
+  status: string;
+  reward_rate: string;
+  budget: string;
+  remaining_budget: string;
+  start_at: string;
+  end_at: string;
+}
+
+export interface Leaderboard {
+  campaign: LeaderboardCampaign | null;
+  totals: { creators: number; rewards: number; paid: string };
+  series_days: number;
+  entries: LeaderboardEntry[];
+}
+
 export interface SocialAccount {
   platform: SocialPlatform;
   username: string;

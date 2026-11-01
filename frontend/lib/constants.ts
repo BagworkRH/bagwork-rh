@@ -45,6 +45,9 @@ export const FUNDING_TOKEN_SYMBOL = process.env.NEXT_PUBLIC_FUNDING_TOKEN || "US
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/campaigns", label: "Campaigns" },
+  // The arena is the shop window: the only page that proves money actually
+  // moves, so it belongs in the primary nav rather than behind the dashboard.
+  { href: "/arena", label: "Arena" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/dashboard", label: "Dashboard" },
   // Brands fund campaigns rather than earn from them, so they get a separate
