@@ -31,6 +31,13 @@ class SellerProfile(models.Model):
     reputation_score = models.PositiveIntegerField(
         default=0, validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
+    # Whether this creator's earnings appear on the public leaderboard.
+    #
+    # Public by default on purpose: an empty board attracts nobody, and the
+    # board is how a visitor sees that money actually moves. Anyone who does
+    # not want their income on display can turn it off, and then keeps their
+    # rank while the figure itself is withheld.
+    show_earnings_publicly = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

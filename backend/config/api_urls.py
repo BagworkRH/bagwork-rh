@@ -9,6 +9,8 @@ Endpoints described in Spec 02:
 """
 from django.urls import include, path
 
+from apps.rewards import leaderboard as leaderboard_views
+
 urlpatterns = [
     # Brand onboarding and stablecoin funding sit at /api/v1/brand/ rather than
     # nested under campaigns/, because a brand exists before it has any
@@ -20,6 +22,9 @@ urlpatterns = [
     path("x/", include("apps.social.urls")),
     path("posts/", include("apps.social.post_urls")),
     path("rewards/", include("apps.rewards.urls")),
+    # Public, and deliberately not under rewards/: this is the platform's own
+    # proof that it pays, readable by anyone deciding whether to join.
+    path("leaderboard/", leaderboard_views.leaderboard, name="leaderboard"),
     path("claims/", include("apps.wallets.urls")),
     path("blockchain/", include("apps.blockchain.urls")),
     path("admin/", include("apps.audit.admin_urls")),

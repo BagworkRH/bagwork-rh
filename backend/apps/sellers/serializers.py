@@ -18,6 +18,7 @@ class SellerProfileSerializer(serializers.ModelSerializer):
             "display_name",
             "status",
             "reputation_score",
+            "show_earnings_publicly",
             "created_at",
             "updated_at",
         )
