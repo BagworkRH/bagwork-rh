@@ -201,6 +201,9 @@ export default function DashboardPage() {
             Include it where campaign rules require a tracking code.
           </span>
         </p>
+        <Link href={`/card/${dashboard.seller.seller_code}`} className="btn btn-outline btn-sm">
+          View my card
+        </Link>
       </div>
 
       <EarningsVisibilityToggle />

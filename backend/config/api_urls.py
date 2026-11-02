@@ -25,6 +25,9 @@ urlpatterns = [
     # Public, and deliberately not under rewards/: this is the platform's own
     # proof that it pays, readable by anyone deciding whether to join.
     path("leaderboard/", leaderboard_views.leaderboard, name="leaderboard"),
+    # A creator's shareable earnings card: the same facts as the board, for one
+    # person, so a payout can be posted as proof.
+    path("card/<str:seller_code>/", leaderboard_views.creator_card, name="creator-card"),
     path("claims/", include("apps.wallets.urls")),
     path("blockchain/", include("apps.blockchain.urls")),
     path("admin/", include("apps.audit.admin_urls")),

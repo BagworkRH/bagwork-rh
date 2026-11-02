@@ -890,3 +890,54 @@ textarea:focus-visible, summary:focus-visible {
 }
 .switch-row strong { display: block; font-size: 0.9rem; }
 .switch-row .muted { display: block; font-size: 0.82rem; }
+
+
+/* A creator's shareable earnings card. It is designed to be screenshotted, so
+   the figure is the largest thing on it and everything else is quiet. */
+.earn-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 24px;
+  border: var(--hairline);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(228, 87, 46, 0.1), var(--bg-elevated));
+}
+.earn-card-head { display: flex; align-items: center; gap: 12px; }
+.earn-card-head h1 { margin: 0; font-size: 1.4rem; }
+.earn-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--field-bg);
+  object-fit: cover;
+}
+.earn-initials { display: grid; place-items: center; font-size: 1.1rem; font-weight: 700; }
+.earn-figure {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-2);
+}
+.earn-figure small { font-size: 0.9rem; color: var(--muted); }
+.earn-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.8rem;
+}
+.earn-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: var(--hairline);
+}

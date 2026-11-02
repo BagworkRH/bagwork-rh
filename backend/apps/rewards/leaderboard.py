@@ -187,3 +187,91 @@ def leaderboard(request):
             "entries": entries,
         }
     )
+
+
+def _rank_in_campaign(campaign_id, seller_id):
+    """(rank, entrants) for one creator in one campaign."""
+    rows = list(
+        Reward.objects.filter(campaign_id=campaign_id, status__in=SETTLED)
+        .values("seller_id")
+        .annotate(earned=Sum("amount"))
+        .order_by("-earned", "seller_id")
+    )
+    for position, row in enumerate(rows, start=1):
+        if row["seller_id"] == seller_id:
+            return position, len(rows)
+    return None, len(rows)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def creator_card(request, seller_code):
+    """One creator's public earnings card, for sharing.
+
+    This is the distribution loop: a creator who has been paid shares proof, and
+    the proof is what recruits the next creator. It reports the same facts as the
+    leaderboard and obeys the same opt-out - a creator who hid their earnings
+    keeps their rank and standing, and the figures are simply absent, rather than
+    handing them a card with nothing on it.
+    """
+    profile = get_object_or_404(SellerProfile, seller_code=seller_code)
+    account = SocialAccount.objects.filter(seller=profile).order_by("id").first()
+    settled = Reward.objects.filter(seller=profile, status__in=SETTLED)
+
+    totals = settled.aggregate(
+        paid=Sum("amount"), rewards=Count("id"), campaigns=Count("campaign", distinct=True)
+    )
+    best = (
+        settled.values("campaign__slug", "campaign__name", "campaign__token_symbol")
+        .annotate(paid=Sum("amount"), rewards=Count("id"))
+        .order_by("-paid", "campaign__slug")
+        .first()
+    )
+
+    card = {
+        "seller_code": profile.seller_code,
+        "display_name": profile.display_name or (account.username if account else "Creator"),
+        "username": account.username if account else None,
+        "avatar_url": account.avatar_url if account else "",
+        "hidden": not profile.show_earnings_publicly,
+        "campaigns": totals["campaigns"] or 0,
+        "rewards": totals["rewards"] or 0,
+        "best_campaign": None,
+    }
+
+    if best:
+        campaign_id = (
+            Reward.objects.filter(
+                seller=profile, status__in=SETTLED, campaign__slug=best["campaign__slug"]
+            )
+            .values_list("campaign_id", flat=True)
+            .first()
+        )
+        rank, entrants = _rank_in_campaign(campaign_id, profile.id)
+        card["best_campaign"] = {
+            "slug": best["campaign__slug"],
+            "name": best["campaign__name"],
+            "token_symbol": best["campaign__token_symbol"],
+            "rank": rank,
+            "entrants": entrants,
+        }
+
+    if profile.show_earnings_publicly:
+        now = timezone.now()
+        deltas = settled.aggregate(
+            d7=Sum("amount", filter=Q(approved_at__gte=now - timedelta(days=7))),
+            d30=Sum("amount", filter=Q(approved_at__gte=now - timedelta(days=30))),
+        )
+        series = _daily_series(settled, SERIES_DAYS).get(profile.id, [])
+        card.update(
+            {
+                "paid": str(totals["paid"] or ZERO),
+                "delta_7d": str(deltas["d7"] or ZERO),
+                "delta_30d": str(deltas["d30"] or ZERO),
+                "series": [float(value) for value in series] or [0.0] * SERIES_DAYS,
+            }
+        )
+    else:
+        card.update({"paid": None, "delta_7d": None, "delta_30d": None, "series": []})
+
+    return Response(card)

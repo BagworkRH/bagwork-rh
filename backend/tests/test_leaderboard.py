@@ -188,3 +188,69 @@ class EarningsVisibilityToggleTests(TestCase):
         entry = APIClient().get(URL, {"campaign": "hide-me"}).json()["entries"][0]
         self.assertTrue(entry["hidden"])
         self.assertIsNone(entry["earned"])
+
+
+class CreatorCardTests(TestCase):
+    """The shareable card: proof that a payout happened, for one person.
+
+    It reports the same facts as the board and obeys the same opt-out, so a
+    creator who hid their earnings still has something worth sharing - their
+    standing - without their income on it.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.campaign = make_campaign(slug="card-campaign")
+        self.alice = _creator("alice", "alice@example.com")
+        self.bob = _creator("bob", "bob@example.com")
+
+    def _card(self, code):
+        return self.client.get(f"/api/v1/card/{code}/")
+
+    def test_it_is_public_and_reports_settled_earnings(self):
+        _reward(self.alice, self.campaign, "3")
+        _reward(self.bob, self.campaign, "5")
+
+        response = self._card(self.alice.seller_code)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(Decimal(body["paid"]), Decimal("3"))
+        self.assertEqual(body["username"], "alice")
+        self.assertEqual(body["rewards"], 1)
+
+    def test_it_reports_rank_within_the_best_campaign(self):
+        _reward(self.alice, self.campaign, "3")
+        _reward(self.bob, self.campaign, "5")
+
+        body = self._card(self.alice.seller_code).json()
+
+        self.assertEqual(body["best_campaign"]["rank"], 2)
+        self.assertEqual(body["best_campaign"]["entrants"], 2)
+
+    def test_hidden_earnings_keep_the_rank_and_drop_the_figures(self):
+        _reward(self.alice, self.campaign, "3")
+        self.alice.show_earnings_publicly = False
+        self.alice.save(update_fields=["show_earnings_publicly"])
+
+        body = self._card(self.alice.seller_code).json()
+
+        self.assertTrue(body["hidden"])
+        self.assertIsNone(body["paid"])
+        self.assertEqual(body["best_campaign"]["rank"], 1)
+        self.assertEqual(body["series"], [])
+
+    def test_unsettled_rewards_do_not_appear(self):
+        _reward(self.alice, self.campaign, "3", status=RewardStatus.PENDING)
+
+        body = self._card(self.alice.seller_code).json()
+
+        self.assertEqual(Decimal(body["paid"]), Decimal("0"))
+        self.assertEqual(body["rewards"], 0)
+
+    def test_unknown_creator_is_a_404(self):
+        self.assertEqual(self._card("SELLER-NOPE").status_code, 404)
+
+    def test_no_address_like_string_is_exposed(self):
+        _reward(self.alice, self.campaign, "1")
+        self.assertNotIn("0x", self._card(self.alice.seller_code).content.decode())

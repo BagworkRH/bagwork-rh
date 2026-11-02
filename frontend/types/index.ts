@@ -224,6 +224,33 @@ export type SocialAccountStatus =
  * earnings - the rank stays, the figure does not. The server enforces that, so
  * the UI only has to render the absence honestly rather than guess at it.
  */
+/**
+ * A creator's shareable earnings card.
+ *
+ * `paid` and the deltas are null when the creator hid their earnings; the rank
+ * and standing survive, because a card with nothing on it is not worth sharing.
+ */
+export interface CreatorCard {
+  seller_code: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string;
+  hidden: boolean;
+  campaigns: number;
+  rewards: number;
+  paid: string | null;
+  delta_7d: string | null;
+  delta_30d: string | null;
+  series: number[];
+  best_campaign: {
+    slug: string;
+    name: string;
+    token_symbol: string;
+    rank: number | null;
+    entrants: number;
+  } | null;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   display_name: string;

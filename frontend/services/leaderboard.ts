@@ -6,7 +6,7 @@
  * limit is per visitor, not per frontend container.
  */
 import { apiRequest } from "@/lib/api";
-import type { Leaderboard } from "@/types";
+import type { CreatorCard, Leaderboard } from "@/types";
 
 export function getLeaderboard(
   params: { campaign?: string; limit?: number; offset?: number } = {}
@@ -17,4 +17,11 @@ export function getLeaderboard(
   if (params.offset) query.set("offset", String(params.offset));
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiRequest<Leaderboard>(`/api/v1/leaderboard/${suffix}`);
+}
+
+/**
+ * One creator's public card, for sharing. Unauthenticated like the board.
+ */
+export function getCreatorCard(sellerCode: string): Promise<CreatorCard> {
+  return apiRequest<CreatorCard>(`/api/v1/card/${sellerCode}/`);
 }
