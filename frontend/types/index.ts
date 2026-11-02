@@ -81,6 +81,8 @@ export interface SellerProfile {
   display_name: string;
   status: "PENDING" | "ACTIVE" | "SUSPENDED";
   reputation_score: number;
+  /** False hides this creator's earnings on the public leaderboard. */
+  show_earnings_publicly: boolean;
   created_at: string;
 }
 

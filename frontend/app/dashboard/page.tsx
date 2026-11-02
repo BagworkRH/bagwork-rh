@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import EarningsVisibilityToggle from "@/components/EarningsVisibilityToggle";
 import { accountStatus, postStatus, toneClass } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { getMyCampaigns } from "@/services/campaigns";
@@ -201,6 +202,8 @@ export default function DashboardPage() {
           </span>
         </p>
       </div>
+
+      <EarningsVisibilityToggle />
 
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>

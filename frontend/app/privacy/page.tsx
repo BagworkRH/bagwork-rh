@@ -60,6 +60,14 @@ export default function PrivacyPage() {
             timestamps and transaction hashes.
           </li>
           <li>
+            <strong>What is public about you</strong> — if you earn in a
+            campaign, the public leaderboard shows your handle, avatar, how
+            many rewards you were paid and the settled amount, ranked against
+            other creators. It never shows your wallet address, and it never
+            shows a post we rejected. You can hide the amount and keep your
+            place — see section 6.
+          </li>
+          <li>
             <strong>Technical data</strong> — your IP address (used to apply rate
             limits and to blunt abuse), request identifiers in our logs, and
             error reports if error tracking is enabled.
@@ -174,6 +182,12 @@ export default function PrivacyPage() {
           Two different things, and the difference matters:
         </p>
         <ul>
+          <li>
+            <strong>Hide your earnings</strong> — the leaderboard is public
+            by default, because an empty board tells a visitor nothing. You
+            can turn it off from your dashboard at any time: your rank stays,
+            the amount is withheld, and nothing else about you changes.
+          </li>
           <li>
             <strong>Disconnect</strong> — stops us reading your account and
             keeps your history. Nothing is deleted, because you may reconnect.

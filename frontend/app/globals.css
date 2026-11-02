@@ -871,3 +871,22 @@ textarea:focus-visible, summary:focus-visible {
 }
 .table-compact td { padding: 6px 8px; border-bottom: var(--hairline); }
 .arena-rail { position: sticky; top: 84px; }
+
+
+/* Leaderboard opt-out. The control has to look like something a creator is
+   allowed to touch, not a system flag they might break. */
+.switch-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 8px;
+  cursor: pointer;
+}
+.switch-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+.switch-row strong { display: block; font-size: 0.9rem; }
+.switch-row .muted { display: block; font-size: 0.82rem; }
