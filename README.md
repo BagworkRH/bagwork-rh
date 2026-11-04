@@ -37,13 +37,19 @@ docs/        Specs 01–05 as markdown
 cd backend
 python -m venv .venv
 .venv\Scripts\activate           # (Linux: source .venv/bin/activate)
-pip install -r requirements/dev.txt
+pip install -r requirements/lock/dev.txt
 copy .env.example .env           # fill in values (SQLite fallback works out of the box)
 python manage.py migrate
 python manage.py seed_demo       # optional: demo sellers/campaigns/posts
 python manage.py test tests      # 179 tests
 python manage.py runserver       # http://localhost:8000/api/health/
 ```
+
+`requirements/*.txt` are hand-edited inputs — names and lower bounds. What gets
+installed is `requirements/lock/*.txt`, compiled to exact versions with hashes
+so a rebuild cannot change the runtime. Change an input, run
+`bash scripts/compile_requirements.sh` from `backend/`, and commit the lock; a
+test fails if the two drift.
 
 `seed_demo` creates 4 campaigns, 6 sellers, 40 posts and rewards so the landing
 page shows real figures. Demo owner login: `demo-owner@example.com` /

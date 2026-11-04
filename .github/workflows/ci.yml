@@ -31,7 +31,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/dev.txt
+          # The lock, not `dev.txt`: pinned versions and hashes, so CI and the
+          # deployed image resolve the same tree. Regenerate with
+          # scripts/compile_requirements.sh; tests/test_dependencies.py guards it.
+          pip install -r requirements/lock/dev.txt
           npm --prefix ../frontend ci
           npm --prefix ../contracts/src/reward_token ci
 

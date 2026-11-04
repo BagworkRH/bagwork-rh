@@ -44,7 +44,7 @@ cd bagwork-rh
 # Backend
 cd backend
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements/prod.txt
+pip install -r requirements/lock/prod.txt
 cp .env.example .env
 
 # Frontend

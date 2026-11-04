@@ -18,8 +18,12 @@ RUN apt-get update \
 WORKDIR /app
 
 # Requirements first, so editing app code does not re-resolve the whole tree.
+# The lock, not `prod.txt`: the input carries names and lower bounds only, so
+# installing it lets a rebuild change the running code with nothing in the diff
+# to review (the 2026-11-04 kombu outage). The lock pins every transitive
+# dependency to an exact version and a hash. See scripts/compile_requirements.sh.
 COPY requirements/ requirements/
-RUN pip install --upgrade pip && pip install -r requirements/prod.txt
+RUN pip install --upgrade pip && pip install -r requirements/lock/prod.txt
 
 COPY . .
 
