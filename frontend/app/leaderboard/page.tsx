@@ -1,4 +1,5 @@
-import LeaderboardTabs from "@/components/LeaderboardTabs";
+import ArenaBoard from "@/components/ArenaBoard";
+import SectorTables from "@/components/SectorTables";
 import { apiRequest } from "@/lib/api";
 import { getLeaderboard } from "@/services/leaderboard";
 import type { Campaign, Leaderboard } from "@/types";
@@ -13,16 +14,16 @@ async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 export const metadata = {
-  title: "Leaderboard — bagworkRH",
+  title: "Mindshare Arena — bagworkRH",
   description:
     "What creators actually earned, ranked by creator, campaign and brand. Settled rewards only.",
 };
 
 /**
- * The full leaderboard.
+ * The arena.
  *
- * Server-rendered so the default board is real on first paint; the tabs and the
- * range/period/metric controls are layered on by the client component.
+ * Server-rendered so the board is real on first paint; the tabs, ranges and
+ * metric switches are layered on by the client component.
  */
 export default async function LeaderboardPage() {
   const [campaigns, board] = await Promise.all([
@@ -32,19 +33,19 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="stack" style={{ gap: 18 }}>
-      <div className="page-head">
-        <div>
-          <span className="eyebrow">Arena</span>
-          <h1>Leaderboard</h1>
-          <p className="lede">
-            What creators actually earned — by creator, by campaign, by brand. Only settled
-            rewards appear, and anyone who hides their earnings keeps their place without
-            the figure.
-          </p>
-        </div>
+      <div className="arena-band">
+        <span className="eyebrow">Arena</span>
+        <h1>Top Voices Creator Arena</h1>
+        <p>
+          What creators actually earned — by creator, by campaign, by brand. Only settled
+          rewards appear, and anyone who hides their earnings keeps their place without the
+          figure.
+        </p>
       </div>
 
-      <LeaderboardTabs initialBoard={board} campaigns={campaigns} />
+      <ArenaBoard initialBoard={board} campaigns={campaigns} />
+      <SectorTables campaigns={campaigns} />
     </div>
   );
 }
+

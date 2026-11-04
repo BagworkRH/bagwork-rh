@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import HomeArena from "@/components/HomeArena";
+import ArenaBoard from "@/components/ArenaBoard";
 import { ArrowRightIcon, CompassIcon, CoinsIcon, TrophyIcon, UsersIcon } from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { apiRequest } from "@/lib/api";
@@ -66,22 +66,24 @@ export default async function HomePage() {
 
   return (
     <div className="container section">
-      <section className="hero" style={{ paddingTop: "clamp(28px, 5vw, 56px)", paddingBottom: 28 }}>
-        <span className="hero-badge">
-          <span className="dot-live" /> Live on Robinhood Chain
-        </span>
-        <h1>Track your voice. Get paid for it.</h1>
-        <p>
-          Publish original posts for a campaign, and bagworkRH verifies them and pays you in
-          stablecoin on-chain. Every figure below is settled money — no estimates.
-        </p>
-        <div className="hero-ctas">
-          <Link href="/dashboard" className="btn btn-primary btn-lg">
-            View your card <ArrowRightIcon size={17} />
-          </Link>
-          <Link href="/leaderboard" className="btn btn-outline btn-lg">
-            Explore the leaderboard
-          </Link>
+      <section className="arena-band">
+        <div className="arena-band-row">
+          <div>
+            <span className="eyebrow">Live on Robinhood Chain</span>
+            <h1>Track your voice with bagworkRH</h1>
+            <p>
+              Publish original posts for a campaign, and bagworkRH verifies them and pays you
+              in stablecoin on-chain. Every figure below is settled money — no estimates.
+            </p>
+          </div>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <Link href="/dashboard" className="btn btn-primary">
+              View your card <ArrowRightIcon size={16} />
+            </Link>
+            <Link href="/leaderboard" className="btn btn-outline">
+              Explore the arena
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -105,7 +107,7 @@ export default async function HomePage() {
       ) : null}
 
       <section style={{ marginTop: 24 }}>
-        <HomeArena initialBoard={board} campaigns={campaigns} />
+        <ArenaBoard initialBoard={board} campaigns={campaigns} />
       </section>
 
       <section className="card" style={{ marginTop: 16 }}>
