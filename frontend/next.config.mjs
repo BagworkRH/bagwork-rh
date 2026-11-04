@@ -1,6 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /**
+   * Route-level redirects.
+   *
+   * `/arena` was the leaderboard's first name. This has to live here rather than
+   * as a `redirect()` inside a page: that page was statically prerendered, and
+   * Next baked the redirect into the RSC payload — the response came back 307
+   * with no `Location` header and an RSC body, which a browser cannot follow.
+   * A config redirect is emitted by the server before any rendering, so it
+   * always carries a real `Location`.
+   */
+  async redirects() {
+    return [{ source: "/arena", destination: "/leaderboard", permanent: false }];
+  },
   async rewrites() {
     return [
       {

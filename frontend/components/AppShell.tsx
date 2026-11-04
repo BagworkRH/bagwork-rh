@@ -25,7 +25,6 @@ const APP_PREFIXES = [
   "/campaigns",
   "/leaderboard",
   "/creators",
-  "/arena", // legacy path; the page redirects to /leaderboard
   "/ops",
 ];
 
