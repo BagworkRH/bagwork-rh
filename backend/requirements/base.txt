@@ -8,13 +8,14 @@ psycopg2-binary>=2.9
 # Async jobs & cache
 celery>=5.4,<6.0
 redis>=5.0
-# kombu's Redis transport imports `packaging` directly. Nothing else pulled it
-# in, so a freshly built image crash-looped worker and beat with
-# "ModuleNotFoundError: No module named 'packaging'" while the previous image
-# kept working. Declared here, and kombu bounded, because a lower-bound-only
-# pin list lets a rebuild change behaviour with nothing in the diff to show it.
-kombu>=5.6,<6.0
-packaging>=24.0
+# `kombu[redis]` is the transport we actually use, and its extra is what
+# supplies `packaging` - imported directly by kombu.transport.redis - along
+# with a bound on the redis client it supports. Asking for plain `kombu` plus
+# `redis` left a freshly built image without `packaging` and crash-looped
+# worker and beat, while the image already running kept working. An extra
+# rather than a bare name, because a lower-bound-only pin list lets a rebuild
+# change behaviour with nothing in the diff to show it.
+kombu[redis]>=5.6,<6.0
 
 # X API
 requests>=2.31
