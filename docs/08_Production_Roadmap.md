@@ -286,6 +286,15 @@ rehearsal.
       erase distinction, and why rewards and claims survive an erasure. These
       are also the terms and privacy URLs X's developer settings require, so
       this closed a compliance gap as well as the last unchecked box here.
+- [ ] Pin the Python dependency tree. `docker compose up -d --build` resolves
+      dependencies as well as compiling code, so a `requirements/base.txt` of
+      lower bounds alone lets a rebuild change the runtime with nothing in the
+      diff to review. It happened on 2026-11-04: a fresh build resolved a kombu
+      whose Redis transport imports `packaging`, `worker` and `beat` crash-looped
+      while the image already running kept working, and the only clue was in the
+      container logs. `kombu[redis]` is declared now (`3d526bf`) and
+      `tests/test_dependencies.py` guards the broker imports, but the rest of the
+      tree is still unpinned. A lock file is the fix.
 
 **Done when:** a provider outage pages someone and the runbook is unambiguous.
 
