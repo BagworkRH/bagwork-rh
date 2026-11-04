@@ -20,6 +20,16 @@ export const metadata = {
 };
 
 /**
+ * The board is live money, so this page must not be prerendered.
+ *
+ * Without this the page is statically generated at build time and its HTML is
+ * frozen: the board kept showing the creators and names it had on the day of the
+ * deploy, and only the client re-fetch corrected it after hydration. The fetch
+ * helper sets no cache policy, so nothing else here opts the route out.
+ */
+export const dynamic = "force-dynamic";
+
+/**
  * The arena.
  *
  * Server-rendered so the board is real on first paint; the tabs, ranges and
