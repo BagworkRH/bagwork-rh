@@ -1,4 +1,6 @@
-import CampaignGrid from "@/components/CampaignGrid";
+import CampaignsExplorer from "@/components/CampaignsExplorer";
+import { CompassIcon } from "@/components/icons";
+import { EmptyState } from "@/components/ui";
 import { apiRequest } from "@/lib/api";
 import type { Campaign } from "@/types";
 
@@ -12,25 +14,40 @@ async function getCampaigns(): Promise<Campaign[]> {
 
 export const metadata = { title: "Campaigns — bagworkRH" };
 
-export default async function CampaignsPage() {
+/**
+ * The campaign marketplace.
+ *
+ * Server-rendered from the public endpoint so the list is real on first paint;
+ * the search/filter/sort view is layered on by the client explorer. `?q=` is
+ * read here so the topbar search can deep-link straight into a filtered list.
+ */
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
   const campaigns = await getCampaigns();
+  const raw = searchParams?.q;
+  const initialQuery = typeof raw === "string" ? raw : "";
 
   return (
-    <div className="container section">
-      <h1>Campaigns</h1>
-      <p className="muted">
-        Join active campaigns, publish qualifying posts, and earn token rewards.
-      </p>
-
-      {campaigns.length === 0 ? (
-        <div className="card">
-          <h3>No active campaigns right now</h3>
-          <p className="muted">
-            Campaigns appear here once they&apos;re live. Check back soon.
+    <div className="stack" style={{ gap: 20 }}>
+      <div className="page-head">
+        <div>
+          <span className="eyebrow">Discover</span>
+          <h1>Campaign marketplace</h1>
+          <p className="lede">
+            Find a campaign, publish an original post, and earn verified token rewards.
           </p>
         </div>
+      </div>
+
+      {campaigns.length === 0 ? (
+        <EmptyState icon={CompassIcon} title="No campaigns right now">
+          Campaigns appear here the moment a brand launches one. Check back soon.
+        </EmptyState>
       ) : (
-        <CampaignGrid campaigns={campaigns} />
+        <CampaignsExplorer campaigns={campaigns} initialQuery={initialQuery} />
       )}
     </div>
   );

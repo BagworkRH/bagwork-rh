@@ -53,7 +53,7 @@ export default function BrandCreateCampaignPage() {
 
   if (authLoading || (user && !loaded)) {
     return (
-      <div className="container section">
+      <div className="page">
         <p className="muted">Loading…</p>
       </div>
     );
@@ -61,7 +61,7 @@ export default function BrandCreateCampaignPage() {
 
   if (!user) {
     return (
-      <div className="container section">
+      <div className="page">
         <div className="card">
           <h1>Create a campaign</h1>
           <p className="muted">
@@ -83,7 +83,7 @@ export default function BrandCreateCampaignPage() {
   // platform-funded campaigns, so they are allowed through without one.
   if (!profile && !isStaff) {
     return (
-      <div className="container section" style={{ maxWidth: 680 }}>
+      <div className="page" style={{ maxWidth: 680 }}>
         <h1>Create a campaign</h1>
         <div className="card">
           <h3>Set up your brand first</h3>
@@ -102,7 +102,7 @@ export default function BrandCreateCampaignPage() {
   }
 
   return (
-    <div className="container section" style={{ maxWidth: 820 }}>
+    <div className="page" style={{ maxWidth: 820 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
           <h1>Create a campaign</h1>

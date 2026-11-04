@@ -35,7 +35,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="container section" style={{ maxWidth: 560 }}>
+      <div style={{ maxWidth: 560 }}>
         <p className="muted">Checking access…</p>
       </div>
     );
@@ -47,7 +47,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
 
   if (!user.is_staff) {
     return (
-      <div className="container section" style={{ maxWidth: 560 }}>
+      <div style={{ maxWidth: 560 }}>
         <h1>Staff console</h1>
         <div className="card">
           <p className="muted">
@@ -68,14 +68,17 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="container section">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ marginBottom: 4 }}>Ops console</h1>
+    <div className="stack" style={{ gap: 18 }}>
+      <div className="page-head">
+        <div>
+          <span className="eyebrow">Staff</span>
+          <h1>Ops console</h1>
+          <p className="lede">
+            Signed in as {user.email}. Every action taken here is written to the audit trail.
+          </p>
+        </div>
         <span className="badge badge-token">staff</span>
       </div>
-      <p className="muted">
-        Signed in as {user.email}. Every action taken here is written to the audit trail.
-      </p>
 
       <nav className="ops-tabs" aria-label="Ops sections">
         {TABS.map((tab) => (

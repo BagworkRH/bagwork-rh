@@ -254,6 +254,8 @@ export interface CreatorCard {
 
 export interface LeaderboardEntry {
   rank: number;
+  /** The creator's public profile key (`/creators/<seller_code>`). */
+  seller_code: string;
   display_name: string;
   username: string | null;
   avatar_url: string;

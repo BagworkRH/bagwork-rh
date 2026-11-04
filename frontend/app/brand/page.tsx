@@ -68,7 +68,7 @@ export default function BrandDashboardPage() {
 
   if (authLoading || (user && loading)) {
     return (
-      <div className="container section">
+      <div className="page">
         <p className="muted">Loading…</p>
       </div>
     );
@@ -76,7 +76,7 @@ export default function BrandDashboardPage() {
 
   if (!user) {
     return (
-      <div className="container section">
+      <div className="page">
         <div className="card">
           <h1>Brand dashboard</h1>
           <p className="muted">
@@ -104,7 +104,7 @@ export default function BrandDashboardPage() {
   }
 
   return (
-    <div className="container section">
+    <div className="page">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
           <h1>{profile.company_name}</h1>
@@ -216,7 +216,7 @@ function BrandOnboard({
   }
 
   return (
-    <div className="container section" style={{ maxWidth: 680 }}>
+    <div className="page" style={{ maxWidth: 680 }}>
       <h1>Set up your brand</h1>
       <p className="muted">
         Brands fund campaigns in {FUNDING_TOKEN_SYMBOL} and are charged only for verified, original,

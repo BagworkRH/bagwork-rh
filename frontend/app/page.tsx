@@ -1,210 +1,207 @@
 import Link from "next/link";
-import { getPlatformStats, type PlatformStats } from "@/lib/stats";
 
-const STEPS = [
-  {
-    title: "Onboard as a seller",
-    body: "Sign in with X and create a unique seller code.",
-  },
-  {
-    title: "Connect your wallet",
-    body: "Link an EVM wallet and verify ownership with a signature.",
-  },
-  {
-    title: "Join a campaign",
-    body: "Pick an active campaign and publish qualifying posts.",
-  },
-  {
-    title: "Get rewarded",
-    body: "We verify posts, track metrics, and pay out token rewards.",
-  },
-];
+import HomeArena from "@/components/HomeArena";
+import { ArrowRightIcon, CompassIcon, CoinsIcon, TrophyIcon, UsersIcon } from "@/components/icons";
+import { ProgressBar } from "@/components/ui";
+import { apiRequest } from "@/lib/api";
+import { formatAmount } from "@/lib/money";
+import { getPlatformStats } from "@/lib/stats";
+import { getLeaderboard } from "@/services/leaderboard";
+import type { Campaign, Leaderboard } from "@/types";
 
-const FAQ = [
-  {
-    q: "What is bagworkRH?",
-    a: "A platform that connects sellers with crypto reward campaigns. Sellers publish qualifying posts for campaigns and earn tokens for verified performance.",
-  },
-  {
-    q: "Do I need to pay to join?",
-    a: "No. Sellers join campaigns for free. Rewards are paid from campaign budgets in the campaign token.",
-  },
-  {
-    q: "How are rewards calculated and paid?",
-    a: "The platform verifies each qualifying post and its metrics, calculates the reward server-side, then lets you claim it from a linked EVM wallet on-chain.",
-  },
-  {
-    q: "Is my wallet safe?",
-    a: "We never ask for your seed phrase or private key. Wallet ownership is verified with a signature over a nonce message and rewards are claimed by your wallet.",
-  },
-];
+/** Compact form for a raw token amount: "1.2M", "8.4k", "912". */
+function compact(value: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
 
-/** Compact display form for a raw token amount, e.g. "1.2M", "840". */
-function formatAmount(raw: string): string {
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return "0";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M+`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+/** A request that must not take the page down with it. */
+async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch {
+    return fallback;
+  }
+}
+
+function budgetUsed(campaign: Campaign): number {
+  const budget = Number(campaign.budget);
+  const remaining = Number(campaign.remaining_budget);
+  if (!Number.isFinite(budget) || budget <= 0 || !Number.isFinite(remaining)) return 0;
+  return Math.max(0, Math.min(100, ((budget - remaining) / budget) * 100));
+}
+
+function endLabel(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 /**
- * Live platform figures. Returns null when the backend is unreachable or
- * there is nothing to report yet — in that case the strip is hidden rather
- * than showing invented numbers.
+ * The landing page — a live data surface, not a brochure.
+ *
+ * Everything on it comes from the platform's own endpoints: the arena board,
+ * the campaign table, the headline figures. When an endpoint is unavailable the
+ * section says so; nothing is filled with an invented number.
  */
-function statCells(stats: PlatformStats | null) {
-  if (!stats) return null;
-  const hasData =
-    stats.claims_completed > 0 ||
-    stats.active_sellers > 0 ||
-    stats.campaigns_total > 0 ||
-    stats.posts_tracked > 0;
-  if (!hasData) return null;
-
-  const cells = [
-    { value: formatAmount(stats.rewards_paid_total), label: "Rewards paid", money: true },
-    { value: stats.claims_completed.toLocaleString("en-US"), label: "Claims completed", money: false },
-    { value: stats.active_sellers.toLocaleString("en-US"), label: "Active sellers", money: false },
-    { value: stats.campaigns_live.toLocaleString("en-US"), label: "Campaigns live", money: false },
-  ];
-  if (stats.verification_rate !== null) {
-    cells.push({
-      value: `${Math.round(stats.verification_rate * 100)}%`,
-      label: "Posts verified",
-      money: false,
-    });
-  }
-  return cells;
-}
-
 export default async function HomePage() {
-  const stats = await getPlatformStats();
-  const cells = statCells(stats);
+  const [stats, campaigns, board] = await Promise.all([
+    getPlatformStats(),
+    safe(apiRequest<Campaign[]>("/api/v1/campaigns/"), [] as Campaign[]),
+    safe(getLeaderboard({ limit: 20 }), null as Leaderboard | null),
+  ]);
+
+  const live = campaigns.filter((campaign) => campaign.status === "ACTIVE");
+  const cards = stats
+    ? [
+        { label: "Rewards paid", value: compact(stats.rewards_paid_total), icon: CoinsIcon },
+        { label: "Claims settled", value: stats.claims_completed.toLocaleString("en-US"), icon: TrophyIcon },
+        { label: "Active creators", value: stats.active_sellers.toLocaleString("en-US"), icon: UsersIcon },
+        { label: "Campaigns live", value: stats.campaigns_live.toLocaleString("en-US"), icon: CompassIcon },
+      ]
+    : [];
 
   return (
-    <>
-      <section className="hero container">
-        <h1>Post for a campaign. Get paid on-chain.</h1>
+    <div className="container section">
+      <section className="hero" style={{ paddingTop: "clamp(28px, 5vw, 56px)", paddingBottom: 28 }}>
+        <span className="hero-badge">
+          <span className="dot-live" /> Live on Robinhood Chain
+        </span>
+        <h1>Track your voice. Get paid for it.</h1>
         <p>
-          Connect your social accounts and wallet, publish qualifying posts,
-          and earn verified token rewards. Every claim is EIP-712 signed and
-          settled on Robinhood Chain.
+          Publish original posts for a campaign, and bagworkRH verifies them and pays you in
+          stablecoin on-chain. Every figure below is settled money — no estimates.
         </p>
         <div className="hero-ctas">
-          <Link href="/dashboard" className="btn btn-primary">
-            Onboard a Seller
+          <Link href="/dashboard" className="btn btn-primary btn-lg">
+            View your card <ArrowRightIcon size={17} />
           </Link>
-          <Link href="/campaigns" className="btn btn-outline">
-            Explore Campaigns
+          <Link href="/leaderboard" className="btn btn-outline btn-lg">
+            Explore the leaderboard
           </Link>
         </div>
       </section>
 
-      {cells && (
-        <section className="container section">
-          <div className="stat-strip">
-            {cells.map((cell) => (
-              <div className="stat-box" key={cell.label}>
-                <div className={`num${cell.money ? " money" : ""}`}>{cell.value}</div>
-                <div className="muted">{cell.label}</div>
+      {cards.length > 0 ? (
+        <section className="stat-strip">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div className="stat-box" key={card.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span className="stat-icon">
+                  <Icon size={18} />
+                </span>
+                <div>
+                  <div className="num">{card.value}</div>
+                  <div className="muted">{card.label}</div>
+                </div>
               </div>
-            ))}
-          </div>
-          <p className="muted stat-note">
-            Live figures from the platform. Rewards are only counted once a
-            claim has been settled on-chain.
-          </p>
+            );
+          })}
         </section>
-      )}
+      ) : null}
 
-      <section className="container section">
-        <h2>How it works</h2>
-        <div className="stepper">
-          {STEPS.map((step) => (
-            <div className="step" key={step.title}>
-              <h3>{step.title}</h3>
-              <p className="muted">{step.body}</p>
+      <section style={{ marginTop: 24 }}>
+        <HomeArena initialBoard={board} campaigns={campaigns} />
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="board-head">
+          <div className="board-title">
+            <h2>Live campaigns</h2>
+            <span className="muted" style={{ fontSize: "0.82rem" }}>
+              what brands are paying for right now
+            </span>
+          </div>
+          <Link href="/campaigns" className="btn btn-outline btn-sm">
+            All campaigns <ArrowRightIcon size={14} />
+          </Link>
+        </div>
+
+        {live.length === 0 ? (
+          <p className="muted">No campaign is live at the moment. Check back soon.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Campaign</th>
+                  <th>Brand</th>
+                  <th style={{ textAlign: "right" }}>Reward / post</th>
+                  <th style={{ textAlign: "right" }}>Budget paid out</th>
+                  <th style={{ textAlign: "right" }}>Ends</th>
+                </tr>
+              </thead>
+              <tbody>
+                {live.slice(0, 12).map((campaign, index) => {
+                  const used = budgetUsed(campaign);
+                  return (
+                    <tr key={campaign.id}>
+                      <td className="rank-cell">{index + 1}</td>
+                      <td>
+                        <Link href={`/campaigns/${campaign.slug}`} style={{ fontWeight: 600 }}>
+                          {campaign.name}
+                        </Link>
+                      </td>
+                      <td className="muted">{campaign.project_name}</td>
+                      <td className="num-cell strong">
+                        {formatAmount(campaign.reward_rate)} {campaign.token_symbol}
+                      </td>
+                      <td className="num-cell">
+                        <span className="row" style={{ gap: 8, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                          <span style={{ width: 72 }}>
+                            <ProgressBar value={used} tone={used >= 90 ? "warn" : "brand"} />
+                          </span>
+                          <span>{Math.round(used)}%</span>
+                        </span>
+                      </td>
+                      <td className="num-cell muted">{endLabel(campaign.end_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="split-even" style={{ display: "grid", gap: 20 }}>
+          <div>
+            <span className="eyebrow">For brands &amp; projects</span>
+            <h2 style={{ marginBottom: 6 }}>Put a budget behind the posts you want</h2>
+            <p className="muted" style={{ maxWidth: "58ch" }}>
+              Fund a campaign in stablecoin, set a fixed reward per verified post, and watch
+              it settle on-chain. Budgets are capped and reserved, payouts are bounded per
+              account, and every financial change is written to an append-only audit trail.
+            </p>
+            <div className="actions">
+              <Link href="/brand" className="btn btn-primary">
+                Fund a campaign
+              </Link>
+              <Link href="/campaigns" className="btn btn-outline">
+                See what is live
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="container section">
-        <h2>For sellers &amp; creators</h2>
-        <div className="grid grid-3">
-          <div className="card">
-            <h3>Verified earnings</h3>
-            <p className="muted">
-              Every reward is calculated from tracked metrics and auditable
-              snapshots — no guesswork.
-            </p>
           </div>
-          <div className="card">
-            <h3>On-chain claims</h3>
-            <p className="muted">
-              Approved rewards move to your connected EVM wallet as real
-              token transfers.
-            </p>
-          </div>
-          <div className="card">
-            <h3>One seller code</h3>
-            <p className="muted">
-              A unique, secure code links your social activity to your
-              campaigns without exposing extra data.
-            </p>
+          <div className="panel">
+            <div className="board-title" style={{ marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>How a payout settles</h3>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 18, color: "var(--text-2)", fontSize: "0.9rem" }}>
+              <li style={{ marginBottom: 6 }}>You publish an original post for a campaign.</li>
+              <li style={{ marginBottom: 6 }}>The platform discovers it and verifies it is original.</li>
+              <li style={{ marginBottom: 6 }}>The reward is calculated server-side and reviewed.</li>
+              <li>Your wallet claims it on-chain, signed with EIP-712.</li>
+            </ol>
           </div>
         </div>
       </section>
-
-      <section className="container section">
-        <h2>For projects &amp; companies</h2>
-        <div className="grid grid-3">
-          <div className="card">
-            <h3>Budget control</h3>
-            <p className="muted">
-              Campaign budgets are protected with caps, reserves, and review.
-              The budget can never go negative.
-            </p>
-          </div>
-          <div className="card">
-            <h3>Fraud-conscious</h3>
-            <p className="muted">
-              Suspicious activity flags go to a review queue; nobody is
-              removed on a weak signal.
-            </p>
-          </div>
-          <div className="card">
-            <h3>Full audit trail</h3>
-            <p className="muted">
-              Every reward, approval, and claim is logged in an append-only
-              audit log.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="container section">
-        <h2>Security &amp; trust</h2>
-        <p className="muted">
-          We follow official X API access, encrypt OAuth credentials at rest,
-          verify wallet ownership by signature, keep financial math in fixed
-          precision, and never log secrets. Smart contracts are minimal,
-          reviewed, and tested on testnet before release.
-        </p>
-      </section>
-
-      <section className="container section">
-        <h2>Frequently asked questions</h2>
-        <div className="faq">
-          {FAQ.map((item) => (
-            <details key={item.q}>
-              <summary>{item.q}</summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-    </>
+    </div>
   );
 }
+

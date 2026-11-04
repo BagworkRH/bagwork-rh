@@ -50,7 +50,7 @@ export default function OpsSignIn({
   }
 
   return (
-    <div className="container section" style={{ maxWidth: 560 }}>
+    <div className="page" style={{ maxWidth: 560 }}>
       <h1>Staff console</h1>
       <p className="muted">
         Sign in with a staff account. This area reviews sellers, posts, rewards and risk; it is

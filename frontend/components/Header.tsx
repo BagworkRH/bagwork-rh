@@ -10,7 +10,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { shortenAddress } from "@/lib/constants";
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { connection, connect, error } = useWallet();
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -75,18 +75,23 @@ export default function Header() {
           {user ? (
             <>
               {user.is_staff ? (
-                <Link href="/ops" className="btn btn-outline btn-sm">
+                <Link href="/ops" className="btn btn-ghost btn-sm">
                   Ops
                 </Link>
               ) : null}
-              <button className="btn btn-ghost btn-sm" onClick={() => void logout()}>
-                Log out
-              </button>
+              <Link href="/dashboard" className="btn btn-primary btn-sm">
+                Dashboard
+              </Link>
             </>
           ) : (
-            <Link href="/dashboard" className="btn btn-primary btn-sm">
-              Onboard
-            </Link>
+            <>
+              <Link href="/dashboard" className="btn btn-ghost btn-sm">
+                Sign in
+              </Link>
+              <Link href="/dashboard/onboard" className="btn btn-primary btn-sm">
+                Get started
+              </Link>
+            </>
           )}
 
           <button

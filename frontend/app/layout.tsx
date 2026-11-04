@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Big_Shoulders_Display, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import AppShell from "@/components/AppShell";
+import { ToastProvider } from "@/components/Toast";
 import { WalletProvider } from "@/hooks/useWallet";
 
 /**
@@ -46,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#151412",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -60,9 +60,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             onboarding must agree on whether a wallet is connected, or one of
             them offers "Connect Wallet" to someone who already connected. */}
         <WalletProvider>
-          <Header />
-          <main className="main">{children}</main>
-          <Footer />
+          <ToastProvider>
+            <AppShell>{children}</AppShell>
+          </ToastProvider>
         </WalletProvider>
       </body>
     </html>

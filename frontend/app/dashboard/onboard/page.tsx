@@ -235,7 +235,7 @@ export default function OnboardPage() {
   }
 
   return (
-    <div className="container section" style={{ maxWidth: 680 }}>
+    <div className="page" style={{ maxWidth: 680 }}>
       <h1>Onboard a seller</h1>
 
       {oauthNotice && (
@@ -259,8 +259,8 @@ export default function OnboardPage() {
         </div>
       )}
 
-<div className="stepper">
-        <div className="step">
+<div className="onboard-flow">
+        <div className="onboard-step">
           <h3>Step 1 — {step === "account" ? "Create account" : "Social accounts"}</h3>
           {step === "account" && !user && (
             <div>
@@ -358,7 +358,7 @@ export default function OnboardPage() {
           )}
         </div>
 
-        <div className="step">
+        <div className="onboard-step">
           <h3>Step 2 — Connect wallet</h3>
           <div className="card">
             {connection.status === "connected" ? (
@@ -392,7 +392,7 @@ export default function OnboardPage() {
             </div>
           </div>
         </div>
-<div className="step">
+<div className="onboard-step">
           <h3>Step 3 — Seller profile &amp; code</h3>
           {sellerCode ? (
             <div className="card">
@@ -413,7 +413,7 @@ export default function OnboardPage() {
           )}
         </div>
 
-        <div className="step">
+        <div className="onboard-step">
           <h3>Step 4 — Confirmation</h3>
           {step === "done" ? (
             <div className="card">
