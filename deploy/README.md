@@ -160,10 +160,48 @@ curl -s https://bagworkrh.com/api/health/ | python3 -m json.tool
 worker cannot consume anything. `heartbeat` is written by the beat container
 every minute, so give it a minute after the first start before believing it.
 
+> **The examples below use `bagworkrh.com`; the box may answer on something else.**
+> `DOMAIN` and `PUBLIC_URL` in `deploy/.env` are the source of truth — this
+> instance runs on its `sslip.io` hostname (`140.238.103.209.sslip.io`) until a
+> real domain is pointed at it. `ALLOWED_HOSTS` holds only that name, so a request
+> to any other host gets a bare `400 Bad Request` from Django, which reads like a
+> broken deploy and is not one. `grep -E '^(DOMAIN|PUBLIC_URL)=' .env` settles it.
+
 Then walk the app: sign up, connect X, join a campaign, and watch
 `docker compose logs -f web worker beat` for the discovery poll landing.
 
 Subsequent deploys do not need the TLS script — just §8.
+
+### Seeding the arena (the demo board)
+
+An empty leaderboard is a bad first impression: the board is the platform's own
+proof that it pays, and one real creator on it does not show what the product
+does. `seed_arena_demo` fills it with clearly-labelled demonstration creators:
+
+```bash
+docker compose --env-file .env exec -T web python manage.py seed_arena_demo --confirm
+docker compose --env-file .env exec -T web python manage.py seed_arena_demo --purge --confirm   # remove it
+```
+
+`--confirm` is required because this writes reward rows. The command is
+idempotent (a second run tops up rather than duplicating) and `--purge` reverses
+it completely, including the campaign.
+
+**Everything it creates is labelled, and the labelling is structural, not
+cosmetic** — a fake row on a board whose whole purpose is proving we pay is the
+most dangerous data in the system:
+
+| Where | What a visitor sees |
+| --- | --- |
+| Creator names | `Demo · Ana` — the prefix is part of the seeded name |
+| Each tile | a `demo` chip, so even a screenshot cannot mislead |
+| The arena page | a banner shown *before* the numbers are read |
+| Share cards | "Demonstration data, not a real payout." |
+| The campaign | named `Demo arena (test data)` |
+| The API | `demo: true` per entry, `has_demo: true` on the board |
+
+Seeded accounts get unusable passwords: they must never be sign-in-able. When
+real creators arrive, `--purge` and the board is honest again.
 
 ## 6. Point X at the production callback
 
