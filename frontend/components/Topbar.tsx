@@ -13,6 +13,7 @@ import {
   MenuIcon,
   SearchIcon,
   TrophyIcon,
+  UserIcon,
   UsersIcon,
   WalletIcon,
 } from "@/components/icons";
@@ -208,8 +209,13 @@ export default function Topbar({
             ) : null}
           </div>
         ) : (
-          <Link href="/dashboard" className="btn btn-primary btn-sm">
-            Get started
+          <Link
+            href="/dashboard/onboard"
+            className="icon-btn"
+            aria-label="Sign in or create an account"
+            title="Sign in / Sign up"
+          >
+            <UserIcon size={19} />
           </Link>
         )}
       </div>

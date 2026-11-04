@@ -143,6 +143,14 @@ export const UsersIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** One person — the profile control, as opposed to the "connections" pair. */
+export const UserIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+  </Svg>
+);
+
 export const FileTextIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import BrandLogo from "@/lib/brand";
-import { CloseIcon, LogOutIcon, PanelLeftIcon } from "@/components/icons";
+import { CloseIcon, LogOutIcon, PanelLeftIcon, UserIcon } from "@/components/icons";
 import {
   BRAND_NAV,
   CREATOR_NAV,
@@ -115,8 +115,9 @@ export default function Sidebar({
             </button>
           </div>
         ) : (
-          <Link href="/dashboard" className="btn btn-primary btn-block btn-sm" onClick={onClose}>
-            Get started
+          <Link href="/dashboard/onboard" className="nav-item" onClick={onClose}>
+            <UserIcon size={18} />
+            <span className="nav-label">Sign in / Sign up</span>
           </Link>
         )}
       </div>

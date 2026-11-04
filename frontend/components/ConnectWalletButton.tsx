@@ -24,6 +24,8 @@ export default function ConnectWalletButton({ onVerified }: { onVerified?: () =>
   const [status, setStatus] = useState<"idle" | "working">("idle");
   const [verified, setVerified] = useState(false);
   const [message, setMessage] = useState<string>("");
+  /** Whether `message` is a success or a failure, so it can be styled as one. */
+  const [tone, setTone] = useState<"ok" | "error">("error");
   const [providerReady, setProviderReady] = useState(true);
 
   // Read after mount only: `window` does not exist during the server render, so
@@ -76,6 +78,7 @@ export default function ConnectWalletButton({ onVerified }: { onVerified?: () =>
       // 3. The server verifies the signature and marks ownership verified.
       const wallet = await verifyWallet(challenge.id, signature);
       setVerified(wallet.verified);
+      setTone(wallet.verified ? "ok" : "error");
       setMessage(
         wallet.verified
           ? "Wallet verified: ownership proven by signature."
@@ -142,8 +145,16 @@ export default function ConnectWalletButton({ onVerified }: { onVerified?: () =>
         )}
       </div>
 
-      {message && <p className="muted">{message}</p>}
-      {walletError && <p className="muted">{walletError}</p>}
+      {message ? (
+        <div className={`banner ${tone === "ok" ? "banner-ok" : "banner-error"}`} style={{ marginBottom: 0 }}>
+          {message}
+        </div>
+      ) : null}
+      {walletError ? (
+        <div className="banner banner-error" style={{ marginBottom: 0 }}>
+          {walletError}
+        </div>
+      ) : null}
     </div>
   );
 }

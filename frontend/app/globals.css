@@ -769,8 +769,13 @@ td.money, td .money { color: var(--accent-2); font-family: var(--font-mono); fon
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
   border: 0;
+  animation: scrim-in 0.22s ease;
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
 }
 
 /* Arena — voice tabs, range path, tile grid, rail --------------------- */
@@ -1531,14 +1536,18 @@ td.money, td .money { color: var(--accent-2); font-family: var(--font-mono); fon
 
 /* Responsive ------------------------------------------------------------ */
 @media (max-width: 1024px) {
+  /* The drawer comes in from the right, on a curve rather than a linear slide. */
   .sidebar {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     z-index: 50;
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: var(--shadow-lg);
+    border-right: 0;
+    border-left: var(--hairline);
   }
   .sidebar.is-open { transform: translateX(0); }
   .sidebar.is-collapsed { flex-basis: var(--shell-sidebar); width: var(--shell-sidebar); }
@@ -1555,20 +1564,37 @@ td.money, td .money { color: var(--accent-2); font-family: var(--font-mono); fon
 }
 
 @media (max-width: 860px) {
+  /* The menu drops in from the right edge as a panel, rather than appearing. */
   .nav {
     position: absolute;
-    top: 100%;
-    left: 0;
+    top: calc(100% + 8px);
     right: 0;
+    left: auto;
+    min-width: min(280px, 86vw);
     flex-direction: column;
     gap: 2px;
-    padding: 12px clamp(16px, 4vw, 28px) 18px;
+    padding: 10px;
     background: var(--surface);
-    border-bottom: var(--hairline);
-    box-shadow: var(--shadow-md);
-    display: none;
+    border: var(--hairline);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    transform: translateX(14px) scale(0.98);
+    transform-origin: top right;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease,
+      visibility 0s linear 0.24s;
   }
-  .nav.nav-open { display: flex; }
+  .nav.nav-open {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease,
+      visibility 0s;
+  }
   .nav a { padding: 11px 12px; font-size: 0.95rem; }
   .menu-toggle { display: grid; }
   .header-inner { position: relative; }
