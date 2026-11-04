@@ -104,7 +104,7 @@ class Command(BaseCommand):
                 user.save(update_fields=["password"])
 
             profile, _ = SellerProfile.objects.get_or_create(
-                user=user, defaults={"display_name": f"Demo \u00b7 {name}"}
+                user=user, defaults={"display_name": name}
             )
             if not profile.is_demo:
                 profile.is_demo = True
