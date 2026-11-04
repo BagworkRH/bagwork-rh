@@ -132,6 +132,10 @@ def leaderboard(request):
         account = accounts.get(row["seller_id"])
         entry = {
             "rank": position,
+            # The public profile key. Already exposed by /card/<seller_code>/,
+            # so a row on the board can link to its creator without leaking
+            # anything the card does not already publish.
+            "seller_code": profile.seller_code,
             "display_name": profile.display_name
             or (account.username if account else "Creator"),
             "username": account.username if account else None,
