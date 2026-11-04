@@ -92,6 +92,9 @@ export default async function CardPage({ params }: { params: Promise<{ code: str
         )}
 
         <p className="muted">{standing}</p>
+        {card.demo && (
+          <p className="muted">Demonstration data, not a real payout.</p>
+        )}
 
         {!card.hidden && (
           <>

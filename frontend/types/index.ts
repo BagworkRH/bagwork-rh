@@ -236,6 +236,7 @@ export interface CreatorCard {
   username: string | null;
   avatar_url: string;
   hidden: boolean;
+  demo: boolean;
   campaigns: number;
   rewards: number;
   paid: string | null;
@@ -258,6 +259,8 @@ export interface LeaderboardEntry {
   avatar_url: string;
   rewards: number;
   hidden: boolean;
+  /** Seeded demonstration data, not a real payout. */
+  demo: boolean;
   earned: string | null;
   share: number | null;
   delta_7d: string | null;
@@ -282,6 +285,8 @@ export interface Leaderboard {
   campaign: LeaderboardCampaign | null;
   totals: { creators: number; rewards: number; paid: string };
   series_days: number;
+  /** True when any entry is seeded demonstration data. */
+  has_demo: boolean;
   entries: LeaderboardEntry[];
 }
 

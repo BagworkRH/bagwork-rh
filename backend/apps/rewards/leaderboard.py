@@ -138,6 +138,7 @@ def leaderboard(request):
             "avatar_url": account.avatar_url if account else "",
             "rewards": row["rewards"],
             "hidden": not profile.show_earnings_publicly,
+            "demo": profile.is_demo,
         }
         if profile.show_earnings_publicly:
             earned = row["earned"]
@@ -184,6 +185,9 @@ def leaderboard(request):
                 "paid": str(total_paid),
             },
             "series_days": SERIES_DAYS,
+            # Lets the page say so, rather than leaving a visitor to work out
+            # from the campaign name whether these are real payouts.
+            "has_demo": any(entry["demo"] for entry in entries),
             "entries": entries,
         }
     )
@@ -234,6 +238,7 @@ def creator_card(request, seller_code):
         "username": account.username if account else None,
         "avatar_url": account.avatar_url if account else "",
         "hidden": not profile.show_earnings_publicly,
+        "demo": profile.is_demo,
         "campaigns": totals["campaigns"] or 0,
         "rewards": totals["rewards"] or 0,
         "best_campaign": None,

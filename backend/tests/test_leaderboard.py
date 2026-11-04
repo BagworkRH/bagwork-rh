@@ -7,11 +7,16 @@ never a figure a creator asked to keep private, and never a wallet address.
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.accounts.models import User
+from apps.campaigns.models import Campaign
 from apps.rewards.models import Reward, RewardStatus
+from apps.sellers.models import SellerProfile
 from apps.social.models import SocialAccount, SocialPlatform
 
 from .helpers import make_campaign, make_user
@@ -254,3 +259,65 @@ class CreatorCardTests(TestCase):
     def test_no_address_like_string_is_exposed(self):
         _reward(self.alice, self.campaign, "1")
         self.assertNotIn("0x", self._card(self.alice.seller_code).content.decode())
+
+
+class DemoLabellingTests(TestCase):
+    """Seeded data must be impossible to mistake for a real payout.
+
+    The board's entire purpose is proving the platform pays, so a demo row on it
+    is the most dangerous data in the system. These tests pin the three things
+    that keep it honest: it is flagged, it says so on the page, and it can be
+    removed in one command.
+    """
+
+    def _seed(self, creators=3, rewards_each=2):
+        call_command("seed_arena_demo", confirm=True, creators=creators, rewards_each=rewards_each)
+
+    def test_seeding_flags_everything_it_creates(self):
+        self._seed()
+
+        profiles = SellerProfile.objects.filter(is_demo=True)
+        self.assertEqual(profiles.count(), 3)
+        self.assertTrue(Reward.objects.filter(seller__in=profiles).exists())
+
+    def test_seeding_is_idempotent(self):
+        self._seed()
+        before = Reward.objects.count()
+        self._seed()
+        self.assertEqual(Reward.objects.count(), before)
+
+    def test_it_refuses_to_run_without_confirm(self):
+        with self.assertRaises(CommandError):
+            call_command("seed_arena_demo")
+
+    def test_the_board_flags_demo_entries(self):
+        self._seed(creators=2, rewards_each=1)
+
+        body = APIClient().get(URL, {"campaign": "demo-arena"}).json()
+
+        self.assertTrue(body["has_demo"])
+        self.assertTrue(all(entry["demo"] for entry in body["entries"]))
+
+    def test_a_real_creator_is_not_flagged(self):
+        real = _creator("real", "real@example.com")
+        _reward(real, make_campaign(slug="real-campaign"), "1")
+
+        body = APIClient().get(URL, {"campaign": "real-campaign"}).json()
+
+        self.assertFalse(body["has_demo"])
+        self.assertFalse(body["entries"][0]["demo"])
+
+    def test_seeded_accounts_cannot_be_signed_into(self):
+        self._seed(creators=1, rewards_each=1)
+        # NAMES[0] is Ana; the command also creates a non-staff `demo_seed`
+        # account to own the demo campaign.
+        for username in ("demo_ana", "demo_seed"):
+            self.assertFalse(User.objects.get(username=username).has_usable_password())
+
+    def test_purge_removes_everything_it_made(self):
+        self._seed()
+        call_command("seed_arena_demo", purge=True, confirm=True)
+
+        self.assertFalse(SellerProfile.objects.filter(is_demo=True).exists())
+        self.assertFalse(Reward.objects.exists())
+        self.assertFalse(Campaign.objects.filter(slug="demo-arena").exists())

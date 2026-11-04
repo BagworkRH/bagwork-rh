@@ -52,6 +52,11 @@ export default function RankedTile({
         >
           {entry.display_name}
         </span>
+        {entry.demo && (
+          <span className="demo-chip" title="Seeded demonstration data, not a real payout">
+            demo
+          </span>
+        )}
         <span className="tile-rank">{entry.rank}</span>
       </header>
 

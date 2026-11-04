@@ -38,6 +38,13 @@ class SellerProfile(models.Model):
     # not want their income on display can turn it off, and then keeps their
     # rank while the figure itself is withheld.
     show_earnings_publicly = models.BooleanField(default=True)
+    # Seeded for demonstrations rather than earned by a real person.
+    #
+    # The leaderboard exists to prove the platform pays, so a demo row on it
+    # is the most dangerous kind of fake data. It is a field rather than a
+    # naming convention so the API can flag it and every surface can label it
+    # without having to guess from a string.
+    is_demo = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

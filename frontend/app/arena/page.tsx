@@ -69,6 +69,14 @@ export default function ArenaPage() {
         )}
       </header>
 
+      {board?.has_demo && (
+        <div className="banner banner-note">
+          Some entries here are <strong>labelled demonstration data</strong> —
+          seeded to show how the arena looks, not real payouts. Everything else
+          is money that actually moved.
+        </div>
+      )}
+
       {state === "loading" && <p className="muted">Loading the board…</p>}
       {state === "error" && (
         <div className="banner banner-error">

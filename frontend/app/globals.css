@@ -941,3 +941,18 @@ textarea:focus-visible, summary:focus-visible {
   padding-top: 12px;
   border-top: var(--hairline);
 }
+
+
+/* Demonstration data has to look different from money, or it is a lie. */
+.demo-chip {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px dashed var(--muted);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.banner-note { color: var(--accent); }
