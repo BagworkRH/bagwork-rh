@@ -31,6 +31,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 
+# Docker copies as root, but the app runs as `node`. Without this Next cannot
+# create `.next/cache`, and a server-side fetch whose result cannot be cached
+# fails outright - which surfaced as every creator profile answering 404.
+RUN chown -R node:node /app
+
 # The base image ships an unprivileged `node` user; the app binds 3000.
 USER node
 EXPOSE 3000

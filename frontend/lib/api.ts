@@ -89,6 +89,11 @@ export async function apiRequest<T>(
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    // A server render always wants live data: every page here shows current
+    // figures. Next's default `force-cache` would both freeze them and make the
+    // render depend on a writable Data Cache - which, in a container running as
+    // an unprivileged user, is a dependency worth not having.
+    ...(typeof window === "undefined" ? { cache: "no-store" as const } : {}),
   });
 
   const data = await response.json().catch(() => ({}));
