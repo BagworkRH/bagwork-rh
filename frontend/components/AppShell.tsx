@@ -53,6 +53,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (window.localStorage.getItem(COLLAPSE_KEY) === "1") setCollapsed(true);
   }, []);
 
+  // Hold the page still behind the drawer rather than letting it scroll away.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [drawerOpen]);
+
   function toggleCollapse() {
     setCollapsed((value) => {
       const next = !value;

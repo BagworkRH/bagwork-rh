@@ -1563,41 +1563,15 @@ td.money, td .money { color: var(--accent-2); font-family: var(--font-mono); fon
   .arena-rail { position: static; }
 }
 
-@media (max-width: 860px) {
-  /* The menu drops in from the right edge as a panel, rather than appearing. */
-  .nav {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    left: auto;
-    min-width: min(280px, 86vw);
-    flex-direction: column;
-    gap: 2px;
-    padding: 10px;
-    background: var(--surface);
-    border: var(--hairline);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    transform: translateX(14px) scale(0.98);
-    transform-origin: top right;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease,
-      visibility 0s linear 0.24s;
-  }
-  .nav.nav-open {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease,
-      visibility 0s;
-  }
-  .nav a { padding: 11px 12px; font-size: 0.95rem; }
+/* The public drawer *is* the app sidebar, so it inherits every rule above and
+   only exists below the sidebar breakpoint. Below that it replaces the inline
+   nav entirely. */
+.nav-drawer { display: none; }
+
+@media (max-width: 1024px) {
+  .nav-drawer { display: flex; }
+  .nav { display: none; }
   .menu-toggle { display: grid; }
-  .header-inner { position: relative; }
 }
 
 @media (max-width: 720px) {
