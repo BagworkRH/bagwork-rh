@@ -1582,6 +1582,10 @@ td.money, td .money { color: var(--accent-2); font-family: var(--font-mono); fon
   .actions > a.btn,
   .hero-ctas > .btn,
   .hero-ctas > a.btn { flex: 1 1 100%; }
+  /* The band's actions drop onto their own line; without this the group shrinks
+     to the width of its longest label and the buttons stop short of the edge. */
+  .arena-band-row { flex-direction: column; align-items: stretch; }
+  .arena-band-row .actions { width: 100%; }
   .field input, .field textarea, .field select { font-size: 16px; }
   .campaign-metrics { grid-template-columns: repeat(2, 1fr); }
   .stat-value { font-size: 1.4rem; }

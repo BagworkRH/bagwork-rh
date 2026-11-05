@@ -50,7 +50,7 @@ export default function ArenaTable({
                 <Avatar name={entry.display_name} src={entry.avatar_url} size="sm" />
                 <span className="who">
                   <span className="nm">{entry.display_name}</span>
-                  {entry.username ? <span className="hd">@{entry.username}</span> : null}
+                  {entry.username ? <span className="hd">{entry.username}</span> : null}
                 </span>
                 {entry.demo ? <span className="demo-chip">demo</span> : null}
               </Link>

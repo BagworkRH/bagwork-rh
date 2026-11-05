@@ -245,7 +245,7 @@ export default function ArenaBoard({
                         <Avatar name={entry.display_name} src={entry.avatar_url} size="sm" />
                         <span className="who">
                           <span className="nm">{entry.display_name}</span>
-                          {entry.username ? <span className="hd">@{entry.username}</span> : null}
+                          {entry.username ? <span className="hd">{entry.username}</span> : null}
                         </span>
                       </Link>
                     </td>
@@ -337,7 +337,7 @@ function VoiceTile({
         <div className="voice-name" title={entry.display_name}>
           {entry.display_name}
         </div>
-        {entry.username ? <div className="voice-handle">@{entry.username}</div> : null}
+        {entry.username ? <div className="voice-handle">{entry.username}</div> : null}
       </div>
 
       <div className="voice-figure">

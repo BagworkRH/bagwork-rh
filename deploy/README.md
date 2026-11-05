@@ -193,7 +193,7 @@ most dangerous data in the system:
 
 | Where | What a visitor sees |
 | --- | --- |
-| Creator names | plain names (`Ana`), with the demo flag carried by the API and the chip |
+| Creator names | plain names and handles (`Ana`, `ana`), with the demo flag carried by the API, the tile chip and the page banner |
 | Each tile | a `demo` chip, so even a screenshot cannot mislead |
 | The arena page | a banner shown *before* the numbers are read |
 | Share cards | "Demonstration data, not a real payout." |

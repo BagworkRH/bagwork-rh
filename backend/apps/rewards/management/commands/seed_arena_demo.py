@@ -94,9 +94,15 @@ class Command(BaseCommand):
         created = 0
         for index in range(creators):
             name = NAMES[index % len(NAMES)]
-            username = f"demo_{name.lower()}"
+            # The login name is internal and stays unmistakably marked, so it can
+            # never be mistaken for a real account in the database. The handle a
+            # visitor reads is a plain one: the demonstration flag is carried by
+            # `is_demo`, the tile chip and the page banner, so the name does not
+            # have to carry it too.
+            login = f"demo_{name.lower()}"
+            handle = name.lower()
             user, user_created = User.objects.get_or_create(
-                username=username, defaults={"email": f"{username}@demo.invalid"}
+                username=login, defaults={"email": f"{login}@demo.invalid"}
             )
             if user_created or user.has_usable_password():
                 # No password: these accounts must never be sign-in-able.
@@ -113,8 +119,8 @@ class Command(BaseCommand):
             SocialAccount.objects.get_or_create(
                 seller=profile,
                 platform=SocialPlatform.X,
-                provider_user_id=username,
-                defaults={"username": username, "status": "CONNECTED"},
+                provider_user_id=login,
+                defaults={"username": handle, "status": "CONNECTED"},
             )
             CampaignParticipation.objects.get_or_create(
                 campaign=campaign, seller=profile, defaults={"status": "ACTIVE"}
