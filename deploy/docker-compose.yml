@@ -53,6 +53,16 @@ services:
       context: ../backend
     restart: unless-stopped
     env_file: .env
+    environment:
+      # `web` is how the frontend reaches this service over the compose network
+      # when it renders API data on the server. Without it here Django answers
+      # 400 DisallowedHost, the fetch behind the page fails, and every
+      # server-rendered page loses its data. The port is not published, so the
+      # name is only resolvable from inside the compose network.
+      #
+      # Appended to the operator's own list rather than replacing it: the value
+      # in `.env` stays the source of truth for the public hostnames.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS},web
     depends_on:
       db:
         condition: service_healthy

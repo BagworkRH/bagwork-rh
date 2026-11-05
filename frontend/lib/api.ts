@@ -19,6 +19,21 @@ export function apiBaseUrl(): string {
   return process.env.INTERNAL_API_URL || publicBase;
 }
 
+/**
+ * Headers for the internal server-to-server hop.
+ *
+ * That hop is plain HTTP inside the compose network, so it needs the header a
+ * TLS-terminating proxy would send: without it Django's `SECURE_SSL_REDIRECT`
+ * answers 301 and the fetch follows it to a port that does not speak TLS. The
+ * Host it presents is the service name, which the API allows (see the `web`
+ * service in docker-compose.yml).
+ */
+export function internalHopHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") return {};
+  if (!process.env.INTERNAL_API_URL) return {};
+  return { "X-Forwarded-Proto": "https" };
+}
+
 const TOKEN_KEY = "bagwork_rh_token";
 
 export function getToken(): string | null {
@@ -100,6 +115,7 @@ export async function apiRequest<T>(
     const token = getToken();
     if (token) headers["Authorization"] = `Token ${token}`;
   }
+  Object.assign(headers, internalHopHeaders());
 
   const response = await fetch(`${apiBaseUrl()}${path}`, {
     method,

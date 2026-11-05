@@ -6,7 +6,7 @@ import Sparkline from "@/components/Sparkline";
 import { formatAmount } from "@/lib/money";
 import type { CreatorCard } from "@/types";
 
-import { apiBaseUrl } from "@/lib/api";
+import { apiBaseUrl, internalHopHeaders } from "@/lib/api";
 
 /**
  * A creator's public earnings card.
@@ -22,7 +22,10 @@ import { apiBaseUrl } from "@/lib/api";
 export const revalidate = 60;
 
 async function loadCard(code: string): Promise<CreatorCard | null> {
-  const response = await fetch(`${apiBaseUrl()}/api/v1/card/${code}/`, { next: { revalidate: 60 } });
+  const response = await fetch(`${apiBaseUrl()}/api/v1/card/${code}/`, {
+    next: { revalidate: 60 },
+    headers: internalHopHeaders(),
+  });
   if (response.status === 404) return null;
   if (!response.ok) return null;
   return (await response.json()) as CreatorCard;

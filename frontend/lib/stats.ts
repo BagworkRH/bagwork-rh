@@ -1,4 +1,4 @@
-import { apiBaseUrl } from "@/lib/api";
+import { apiBaseUrl, internalHopHeaders } from "@/lib/api";
 
 /**
  * Platform statistics shown on the landing page.
@@ -25,6 +25,7 @@ export async function getPlatformStats(): Promise<PlatformStats | null> {
   try {
     const res = await fetch(`${apiBaseUrl()}/api/v1/campaigns/stats/`, {
       cache: "no-store",
+      headers: internalHopHeaders(),
     });
     if (!res.ok) return null;
     return (await res.json()) as PlatformStats;
