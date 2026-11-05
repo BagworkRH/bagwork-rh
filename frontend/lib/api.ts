@@ -1,7 +1,23 @@
 /** API client for the Django REST backend (Spec 02 endpoints). */
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/**
+ * Where the API lives.
+ *
+ * The browser can only reach the public URL, so that is what it gets. A server
+ * render is inside the compose network and must not go back out through nginx:
+ * that hop spends the anonymous rate limit meant for visitors, and when it runs
+ * dry the page behind the fetch fails. `INTERNAL_API_URL` is set by compose for
+ * exactly that case, and everything else (local dev, a platform with no internal
+ * network) falls back to the public URL.
+ *
+ * `process.env.INTERNAL_API_URL` is only ever evaluated on the server — the
+ * browser takes the first branch — so the client bundle never touches it.
+ */
+export function apiBaseUrl(): string {
+  const publicBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  if (typeof window !== "undefined") return publicBase;
+  return process.env.INTERNAL_API_URL || publicBase;
+}
 
 const TOKEN_KEY = "bagwork_rh_token";
 
@@ -85,7 +101,7 @@ export async function apiRequest<T>(
     if (token) headers["Authorization"] = `Token ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,

@@ -112,6 +112,17 @@ services:
         # build arg rather than a runtime variable — see frontend/Dockerfile.
         NEXT_PUBLIC_API_URL: ${PUBLIC_URL}
     restart: unless-stopped
+    environment:
+      # A server render (the board, a creator's card, the campaign list) fetches
+      # the API directly over the compose network. Going back out through the
+      # public URL would traverse nginx and spend the anonymous rate limit that
+      # exists for visitors.
+      INTERNAL_API_URL: http://web:8000
+    # The frontend renders API data on the server, so it must not start before
+    # the API can answer.
+    depends_on:
+      web:
+        condition: service_healthy
     expose:
       - "3000"
     healthcheck:

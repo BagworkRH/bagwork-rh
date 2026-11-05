@@ -17,7 +17,7 @@ from the ``THROTTLE_*`` environment variables — see `.env.example`.
 """
 from django.core.exceptions import ImproperlyConfigured
 from rest_framework.settings import api_settings
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 
 
 class PathScopedThrottle(SimpleRateThrottle):
@@ -134,3 +134,44 @@ class HealthThrottle(PathScopedThrottle):
 
     scope = "health"
     path_prefixes = ("/api/health/",)
+
+
+# The public, read-only data the product is built around: the board, a creator's
+# card, and the campaign list. These are not an abuse surface — they are what a
+# visitor comes to read — and they are also what the frontend renders *on the
+# server*, so one container IP accounts for every visitor's page view. On the
+# anonymous baseline that bucket (100/hour) empties during ordinary traffic, the
+# fetch behind a page fails, and the page answers 404 — an outage caused by a
+# rate limit meant for scrapers.
+PUBLIC_DATA_PREFIXES = (
+    "/api/v1/leaderboard/",
+    "/api/v1/card/",
+    "/api/v1/campaigns/",
+)
+
+
+class PublicDataThrottle(PathScopedThrottle):
+    """Generous limit for the public read endpoints.
+
+    A ceiling is still kept so the endpoints cannot be used as a free
+    amplification target; it is simply sized for page views rather than for
+    credential stuffing.
+    """
+
+    scope = "public"
+    path_prefixes = PUBLIC_DATA_PREFIXES
+
+
+class BaselineAnonThrottle(AnonRateThrottle):
+    """The anonymous baseline, minus the public read endpoints.
+
+    DRF applies every throttle class and denies the request if any one of them
+    denies it, so a larger bucket on the public paths would be meaningless while
+    the baseline still counted them. Those paths are therefore excluded here and
+    carry the `public` scope instead.
+    """
+
+    def allow_request(self, request, view):
+        if request.path.startswith(PUBLIC_DATA_PREFIXES):
+            return True
+        return super().allow_request(request, view)

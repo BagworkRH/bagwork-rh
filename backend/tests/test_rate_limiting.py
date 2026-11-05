@@ -26,9 +26,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 
 from apps.accounts.models import User
+from config.throttling import BaselineAnonThrottle
 
 TOO_MANY = status.HTTP_429_TOO_MANY_REQUESTS
 
@@ -47,6 +48,9 @@ TINY_SCOPES = {
     # `/api/health/` has a dedicated bucket (see `HealthThrottle`); it is kept
     # generous here so it never interferes with the scope under test.
     "health": "1000/hour",
+    # The public read endpoints (the board, a creator's card, the campaign list)
+    # carry their own generous bucket; generous here too, for the same reason.
+    "public": "1000/hour",
 }
 # ...and the inverse: a tiny anonymous baseline with the scopes out of the way.
 TINY_ANON = {**TINY_SCOPES, "anon": "2/hour"}
@@ -109,11 +113,39 @@ class RateLimitingTests(TestCase):
         with throttle_rates(TINY_SCOPES):
             self.assertThrottled("/api/v1/claims/1/authorization/")
 
-    def test_baseline_anon_throttle_applies_to_public_reads(self):
-        # `/api/health/` has its own bucket (asserted below), so the anonymous
-        # baseline is checked against a real public endpoint instead.
+    def test_public_reads_do_not_consume_the_anonymous_budget(self):
+        # The board, a creator's card and the campaign list are rendered by the
+        # frontend *on the server*, so one container IP accounts for every
+        # visitor's page view. On the anonymous budget (100/hour) that bucket
+        # empties in ordinary traffic, the fetch behind a page fails, and the
+        # page answers 404 - an outage caused by a limit meant for scrapers.
         with throttle_rates(TINY_ANON):
+            for _ in range(30):
+                resp = self.client.get("/api/v1/campaigns/")
+                self.assertNotEqual(resp.status_code, TOO_MANY, resp.data)
+
+    def test_public_reads_still_have_their_own_ceiling(self):
+        # Exempting them from the baseline must not leave them unmetered.
+        rates = {**TINY_ANON, "public": "2/hour"}
+        with throttle_rates(rates):
             self.assertThrottled("/api/v1/campaigns/", attempts=2)
+
+    def test_baseline_anon_throttle_skips_only_the_public_prefixes(self):
+        # Asserted at unit level for two reasons: DRF throttles *after*
+        # permissions, so an anonymous request to a non-public endpoint is
+        # rejected as unauthenticated before any throttle sees it; and DRF's own
+        # AnonRateThrottle reads a rate captured at import, so a patched rate
+        # would not reach it. What matters is the delegation, so that is what is
+        # asserted: the public paths never consult the parent, everything else
+        # always does.
+        throttle = BaselineAnonThrottle()
+        public = mock.Mock(path="/api/v1/campaigns/", META={})
+        other = mock.Mock(path="/api/v1/posts/", META={})
+        with mock.patch.object(AnonRateThrottle, "allow_request", return_value=False) as parent:
+            self.assertTrue(throttle.allow_request(public, mock.Mock()))
+            parent.assert_not_called()
+            self.assertFalse(throttle.allow_request(other, mock.Mock()))
+            parent.assert_called_once()
 
     def test_health_probes_do_not_consume_the_anonymous_budget(self):
         # The compose healthcheck polls /api/health/ every 30s — 120 requests an

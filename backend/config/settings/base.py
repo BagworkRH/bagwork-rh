@@ -137,12 +137,18 @@ REST_FRAMEWORK = {
     # The scoped classes are path-selective (see `config/throttling.py`) and
     # only throttle auth / admin / wallet surfaces; the baselines cover
     # everything else. All rates are tunable via THROTTLE_* env vars.
+    #
+    # The anonymous baseline is the project's own subclass, because the public
+    # read endpoints are excluded from it and carry the much larger `public`
+    # scope instead — the frontend renders them on the server, so one container
+    # IP accounts for every visitor's page view.
     "DEFAULT_THROTTLE_CLASSES": [
         "config.throttling.AdminThrottle",
         "config.throttling.AuthThrottle",
         "config.throttling.WalletThrottle",
         "config.throttling.SubmissionThrottle",
-        "rest_framework.throttling.AnonRateThrottle",
+        "config.throttling.PublicDataThrottle",
+        "config.throttling.BaselineAnonThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
@@ -160,6 +166,10 @@ REST_FRAMEWORK = {
         # monitor asks for. On the `anon` budget those probes would start
         # receiving 429s an hour into every deploy and make `web` unhealthy.
         "health": os.environ.get("THROTTLE_HEALTH", "1200/hour"),
+        # The board, a creator's card and the campaign list: read-only, and
+        # rendered server-side by the frontend, so this bucket stands in for
+        # every visitor at once. Sized for page views, not for one browser.
+        "public": os.environ.get("THROTTLE_PUBLIC", "6000/hour"),
     },
 }
 

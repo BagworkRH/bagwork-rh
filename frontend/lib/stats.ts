@@ -1,3 +1,5 @@
+import { apiBaseUrl } from "@/lib/api";
+
 /**
  * Platform statistics shown on the landing page.
  *
@@ -18,12 +20,10 @@ export type PlatformStats = {
   verification_rate: number | null;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 /** Fetch the headline figures. Returns null if the backend is unavailable. */
 export async function getPlatformStats(): Promise<PlatformStats | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/campaigns/stats/`, {
+    const res = await fetch(`${apiBaseUrl()}/api/v1/campaigns/stats/`, {
       cache: "no-store",
     });
     if (!res.ok) return null;
