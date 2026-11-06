@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { BarSeries } from "@/components/charts";
 import { InfoIcon, TrophyIcon } from "@/components/icons";
 import Sparkline from "@/components/Sparkline";
 import { Avatar, EmptyState, Skeleton } from "@/components/ui";
+import TopGainersRail from "@/components/TopGainersRail";
 import { BOARD_RANGES, useLeaderboardBoard } from "@/hooks/useLeaderboardBoard";
 import { formatAmount } from "@/lib/money";
 import type { Campaign, Leaderboard, LeaderboardEntry } from "@/types";
@@ -44,13 +45,13 @@ function tabArt(name: string): string {
 }
 
 /** A signed movement figure for the rail. */
-function DeltaCell({ value }: { value: string | null }) {
+export function DeltaCell({ value }: { value: string | null }) {
   const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric) || numeric === 0) return <span className="muted">—</span>;
+  if (!Number.isFinite(numeric) || numeric === 0) return <span className="muted">â€”</span>;
   const up = numeric > 0;
   return (
     <span className={up ? "delta-up" : "delta-down"}>
-      {up ? "▲" : "▼"} {formatAmount(String(Math.abs(numeric)))}
+      {up ? "â–²" : "â–¼"} {formatAmount(String(Math.abs(numeric)))}
     </span>
   );
 }
@@ -58,7 +59,7 @@ function DeltaCell({ value }: { value: string | null }) {
 /**
  * The arena: category tabs, a rank range, the tile grid, and the Top Gainer
  * rail. Shared by the landing page and `/leaderboard` so both show the same
- * board — a visitor who likes what they see on the front page finds exactly it
+ * board â€” a visitor who likes what they see on the front page finds exactly it
  * again one click later.
  */
 export default function ArenaBoard({
@@ -96,17 +97,6 @@ export default function ArenaBoard({
     return out;
   }, [entries]);
 
-  const railRows = useMemo(
-    () => [...entries].sort((a, b) => delta(b, period) - delta(a, period)).slice(0, 10),
-    [entries, period]
-  );
-
-  function currentFigure(entry: LeaderboardEntry) {
-    if (entry.hidden) return <span className="muted">Hidden</span>;
-    if (metric === "share") return `${((entry.share ?? 0) * 100).toFixed(2)}%`;
-    return formatAmount(entry.earned ?? "0");
-  }
-
   return (
     <div className="arena-split">
       <div>
@@ -136,7 +126,7 @@ export default function ArenaBoard({
           <div className="range-path">
             {BOARD_RANGES.map((range, index) => (
               <span key={range.label} className="row" style={{ gap: 12 }}>
-                {index > 0 ? <span className="range-sep">›</span> : null}
+                {index > 0 ? <span className="range-sep">â€º</span> : null}
                 <button
                   className={`range-step ${index === rangeIndex ? "is-active" : ""}`}
                   onClick={() => setRangeIndex(index)}
@@ -179,7 +169,7 @@ export default function ArenaBoard({
             }
           >
             This board fills the moment a creator&apos;s reward is settled. Nothing here is
-            estimated — every figure is money that actually moved.
+            estimated â€” every figure is money that actually moved.
           </EmptyState>
         ) : (
           <>
@@ -211,57 +201,7 @@ export default function ArenaBoard({
       </div>
 
       <aside className="rail">
-        <div className="rail-card">
-          <div className="rail-head">
-            <h3>Top Gainer</h3>
-            <div className="seg" role="group" aria-label="Metric">
-              <button className={metric === "earned" ? "is-active" : ""} onClick={() => setMetric("earned")} aria-pressed={metric === "earned"}>
-                Absolute
-              </button>
-              <button className={metric === "share" ? "is-active" : ""} onClick={() => setMetric("share")} aria-pressed={metric === "share"}>
-                Relative (%)
-              </button>
-            </div>
-          </div>
-          {railRows.length === 0 ? (
-            <p className="muted" style={{ fontSize: "0.85rem" }}>
-              Nothing to rank yet.
-            </p>
-          ) : (
-            <table className="rail-list">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th className="r">Current</th>
-                  <th className="r">Δ 7D</th>
-                  <th className="r">Δ 30D</th>
-                </tr>
-              </thead>
-              <tbody>
-                {railRows.map((entry) => (
-                  <tr key={`${entry.rank}-${entry.seller_code}`}>
-                    <td>
-                      <Link href={`/creators/${entry.seller_code}`} className="rail-name">
-                        <Avatar name={entry.display_name} src={entry.avatar_url} size="sm" />
-                        <span className="who">
-                          <span className="nm">{entry.display_name}</span>
-                          {entry.username ? <span className="hd">{entry.username}</span> : null}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="r">{currentFigure(entry)}</td>
-                    <td className="r">
-                      <DeltaCell value={entry.delta_7d} />
-                    </td>
-                    <td className="r">
-                      <DeltaCell value={entry.delta_30d} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <TopGainersRail entries={entries} />
 
         <div className="rail-card">
           <div className="rail-head">
@@ -366,3 +306,4 @@ function VoiceTile({
     </Link>
   );
 }
+

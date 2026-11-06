@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ArenaBoard from "@/components/ArenaBoard";
+import StatStrip from "@/components/StatStrip";
 import { ArrowRightIcon, CompassIcon, CoinsIcon, TrophyIcon, UsersIcon } from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { apiRequest } from "@/lib/api";
@@ -87,24 +88,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {cards.length > 0 ? (
-        <section className="stat-strip">
-          {cards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div className="stat-box" key={card.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="stat-icon">
-                  <Icon size={18} />
-                </span>
-                <div>
-                  <div className="num">{card.value}</div>
-                  <div className="muted">{card.label}</div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      ) : null}
+      <StatStrip cards={cards} entries={board?.entries ?? []} />
 
       <section style={{ marginTop: 24 }}>
         <ArenaBoard initialBoard={board} campaigns={campaigns} />
