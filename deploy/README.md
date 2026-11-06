@@ -116,6 +116,10 @@ Fill in `deploy/.env`:
 - `FRONTEND_URL` — `https://<DOMAIN>`.
 - `RPC_URL` and the chain values — use a paid RPC provider in production, since
   the public endpoints are rate-limited and this process polls continuously.
+- `REQUIRE_VERIFIED_ACCOUNTS` — defaults to `true`, meaning posts are only tracked
+  for X accounts carrying a verification badge. The badge is a *paid* X Premium
+  subscription, so this is a supply filter, not a fraud control; see `docs/03`
+  before turning it off.
 
 `deploy/.env` is gitignored via the root `.env` rule. It is the single source of
 production configuration: compose reads it for interpolation **and** mounts it

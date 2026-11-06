@@ -217,8 +217,22 @@ class OfficialXProvider(SocialProvider):
         return {"Authorization": f"Bearer {access_token}"}
 
     def get_account(self, access_token):
+        """Fetch the authenticated account's identity, including its badge.
+
+        `verified_type` is requested and the legacy `verified` boolean is not,
+        deliberately: X reported `verified: false` for Premium subscribers with a
+        visible blue badge (xurl issue #41, fixed in v1.2.0) while
+        `verified_type` said "blue" in the same response. Since this value gates
+        whether a creator is paid, the trustworthy field is the only one worth
+        fetching.
+
+        X omits `verified_type` altogether for an account with no badge, so a
+        missing value here means "no badge" — and it is normalised to "none"
+        rather than passed through as `None`.
+        """
         resp = requests.get(
-            "https://api.twitter.com/2/users/me?user.fields=name,username,profile_image_url",
+            "https://api.twitter.com/2/users/me"
+            "?user.fields=name,username,profile_image_url,verified_type",
             headers=self._headers(access_token),
             timeout=30,
         )
@@ -229,6 +243,7 @@ class OfficialXProvider(SocialProvider):
             "username": data["username"],
             "display_name": data.get("name", ""),
             "avatar_url": data.get("profile_image_url", ""),
+            "verified_type": data.get("verified_type") or "none",
             "scopes": [],
         }
 

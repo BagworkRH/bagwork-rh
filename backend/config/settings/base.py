@@ -288,6 +288,22 @@ X_CLIENT_ID = os.environ.get("X_CLIENT_ID", "")
 X_CLIENT_SECRET = os.environ.get("X_CLIENT_SECRET", "")
 X_REDIRECT_URI = os.environ.get("X_REDIRECT_URI", "")
 
+# Whether a connected account must carry a verification badge for its posts to
+# be tracked at all (Spec 03).
+#
+# Two things to be clear about before switching this on or off. The X badge is a
+# *paid subscription* (X Premium), so requiring it necessarily excludes every
+# creator who will not pay for one — it is a supply filter, not a quality
+# signal. And it is not a fraud control: spammers buy badges too, so the
+# anti-abuse signals in `apps.audit.risk` remain what actually catches farming.
+#
+# Read per call rather than captured at import, so it can be overridden in a
+# test without reloading settings.
+REQUIRE_VERIFIED_ACCOUNTS = os.environ.get(
+    "REQUIRE_VERIFIED_ACCOUNTS", "true"
+).strip().lower() in ("1", "true", "yes", "on")
+
+
 # Key used to encrypt stored OAuth credentials at rest (Spec 02/03). Prefer a
 # dedicated value so rotating SECRET_KEY does not render every stored token
 # undecryptable; falls back to SECRET_KEY when unset. Rotate it with

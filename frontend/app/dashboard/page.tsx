@@ -107,6 +107,13 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<JoinedCampaign[]>([]);
   const [campaignsState, setCampaignsState] = useState<LoadState>("loading");
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  /**
+   * The server's rule that only verified accounts are tracked, so this panel can
+   * say that an unverified account earns nothing instead of showing "Connected"
+   * and leaving the creator to wonder. Read from the API rather than assumed,
+   * because the rule is a setting that can be off.
+   */
+  const [verifiedRequired, setVerifiedRequired] = useState(false);
   const [card, setCard] = useState<CreatorCard | null>(null);
 
   useEffect(() => {
@@ -139,7 +146,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return;
     getConnections()
-      .then((data) => setAccounts(data.connections))
+      .then((data) => {
+        setAccounts(data.connections);
+        setVerifiedRequired(Boolean(data.verified_accounts_required));
+      })
       .catch(() => setAccounts([]));
   }, [user]);
 
@@ -394,19 +404,34 @@ export default function DashboardPage() {
             {accounts.length === 0 ? (
               <p className="muted">Link the accounts you publish from so we can find your posts.</p>
             ) : (
-              <ul className="joined-campaigns">
-                {accounts.map((account) => {
-                  const state = accountStatus(account.status);
-                  return (
-                    <li key={`${account.platform}-${account.username}`}>
-                      <span className="row" style={{ gap: 8, flex: "1 1 auto" }}>
-                        <UsersIcon size={16} />@{account.username}
-                      </span>
-                      <span className={toneClass(state.needsReconnect ? "bad" : "ok")}>{state.text}</span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul className="joined-campaigns">
+                  {accounts.map((account) => {
+                    const state = accountStatus(account.status);
+                    const unpaid = !account.is_verified && verifiedRequired;
+                    return (
+                      <li key={`${account.platform}-${account.username}`}>
+                        <span className="row" style={{ gap: 8, flex: "1 1 auto" }}>
+                          <UsersIcon size={16} />@{account.username}
+                          {unpaid && (
+                            <span className="badge badge-warn">Not verified</span>
+                          )}
+                        </span>
+                        <span className={toneClass(state.needsReconnect ? "bad" : "ok")}>
+                          {state.text}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {accounts.some((a) => !a.is_verified) && verifiedRequired && (
+                  <p className="muted" style={{ marginTop: 12, fontSize: "0.8125rem" }}>
+                    Posts are only tracked for verified accounts, so an unverified
+                    one earns nothing yet. The badge is re-checked daily — verifying
+                    the account is enough, with no need to reconnect.
+                  </p>
+                )}
+              </>
             )}
           </div>
 

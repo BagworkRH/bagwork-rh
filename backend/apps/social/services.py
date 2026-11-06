@@ -12,12 +12,13 @@ import json
 from datetime import timedelta
 
 from cryptography.exceptions import InvalidTag
+from django.conf import settings
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
 
 from .crypto_utils import decrypt_secret, encrypt_secret
-from .models import SocialAccount, SocialPlatform
+from .models import SocialAccount, SocialPlatform, normalize_verified_type
 from .providers import get_provider
 from .providers.base import SocialProviderAuthError, SocialProviderError
 
@@ -33,6 +34,7 @@ def link_social_account(seller, identity, *, platform=SocialPlatform.X, actor=No
     ciphertext, iv = encrypt_secret(creds.decode("utf-8"))
 
     scopes = identity.get("scopes", [])
+    verified_type = normalize_verified_type(identity.get("verified_type"))
 
     account, created = SocialAccount.objects.update_or_create(
         platform=platform,
@@ -48,6 +50,10 @@ def link_social_account(seller, identity, *, platform=SocialPlatform.X, actor=No
             # Recorded so a renewal can happen before the token expires,
             # not after the first 401 of a discovery run.
             "token_expiry": identity.get("expires_at"),
+            # The badge was read from the provider seconds ago, so record when.
+            # Discovery re-reads it on a timer because Premium lapses.
+            "verified_type": verified_type,
+            "verification_checked_at": timezone.now(),
             "status": "CONNECTED",
         },
     )
@@ -61,6 +67,7 @@ def link_social_account(seller, identity, *, platform=SocialPlatform.X, actor=No
             "platform": platform,
             "provider_user_id": account.provider_user_id,
             "seller_code": seller.seller_code,
+            "verified_type": verified_type,
         },
     )
     return account
@@ -214,3 +221,81 @@ def _mark_reauth_required(account) -> None:
         object_id=str(account.pk),
         metadata={"platform": account.platform, "reason": "refresh token rejected"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Account verification
+# ---------------------------------------------------------------------------
+
+# How long a verification badge is trusted before it is re-read from the
+# provider.
+#
+# X Premium is a *subscription*. An account can be verified when it is connected
+# and unverified a month later with nothing on this side changing, so a
+# connect-time check alone would let someone subscribe for one month, connect,
+# cancel, and keep earning for as long as they liked. Re-reading once a day
+# bounds both the damage (a lapsed badge stops earning within a day) and the
+# cost (one extra API call per account per day, rather than one per poll).
+VERIFICATION_TTL = timedelta(hours=24)
+
+
+def verified_accounts_required() -> bool:
+    """Whether posts are only tracked for accounts that carry a verification badge.
+
+    A setting rather than a constant, because it is a product decision with a
+    real cost: the X badge is a paid subscription, so requiring it excludes
+    every creator who will not pay for one. That has to be flippable without a
+    code change.
+    """
+    return bool(getattr(settings, "REQUIRE_VERIFIED_ACCOUNTS", True))
+
+
+def verification_is_stale(account) -> bool:
+    """True when the stored badge is old enough to be worth re-reading."""
+    checked = account.verification_checked_at
+    if checked is None:
+        return True
+    return checked <= timezone.now() - VERIFICATION_TTL
+
+
+def refresh_account_verification(account, *, force=False) -> bool:
+    """Re-read an account's verification badge; return whether it counts as verified.
+
+    Within `VERIFICATION_TTL` this answers from the stored value and makes no
+    call, so calling it before every poll is cheap.
+
+    On a provider failure nothing is written: an outage must not silently strip
+    a verified creator of their badge and stop their earnings, which is the same
+    rule that stops a post being marked VERIFIED while the provider is down. The
+    error is raised instead, so the caller can tell "no badge" from "we could not
+    find out" and skip this poll rather than act on a guess.
+    """
+    if not force and not verification_is_stale(account):
+        return account.is_verified
+
+    provider = get_provider(account.platform)
+    identity = with_fresh_token(account, provider.get_account)
+    verified_type = normalize_verified_type(identity.get("verified_type"))
+
+    changed = verified_type != account.verified_type
+    account.verified_type = verified_type
+    account.verification_checked_at = timezone.now()
+    account.save(update_fields=["verified_type", "verification_checked_at"])
+
+    if changed:
+        # A badge appearing or disappearing changes whether this creator can be
+        # paid, so it is an auditable event rather than a quiet field update.
+        AuditLog.objects.create(
+            actor=None,
+            action="SOCIAL_VERIFICATION_CHANGED",
+            object_type="SocialAccount",
+            object_id=str(account.pk),
+            metadata={
+                "platform": account.platform,
+                "provider_user_id": account.provider_user_id,
+                "seller_code": account.seller.seller_code,
+                "verified_type": verified_type,
+            },
+        )
+    return account.is_verified
+

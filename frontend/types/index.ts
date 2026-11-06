@@ -299,6 +299,19 @@ export interface SocialAccount {
   status: SocialAccountStatus;
   connected_at: string;
   last_synced_at: string | null;
+  /**
+   * The account's verification badge (`blue` / `business` / `government`), or
+   * `none`. X Premium is a paid subscription and can lapse, so the server
+   * re-reads this daily rather than trusting it from connect time.
+   */
+  verified_type: string;
+  /**
+   * Whether this account's posts can be tracked at all. `false` is not an error
+   * — it is the server's answer to "will I be paid for posting?", and the UI has
+   * to say so, because an account that looks connected but earns nothing is the
+   * most confusing state this product can present.
+   */
+  is_verified: boolean;
 }
 
 /**

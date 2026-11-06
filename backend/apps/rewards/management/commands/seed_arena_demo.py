@@ -120,7 +120,17 @@ class Command(BaseCommand):
                 seller=profile,
                 platform=SocialPlatform.X,
                 provider_user_id=login,
-                defaults={"username": handle, "status": "CONNECTED"},
+                defaults={
+                    "username": handle,
+                    "status": "CONNECTED",
+                    # These accounts stand in for working creators, and only a
+                    # verified account's posts are tracked at all — a demo board
+                    # staffed by creators who could not earn would misrepresent
+                    # the product. The demonstration labelling is carried by
+                    # `is_demo` and the API, exactly as it is for names.
+                    "verified_type": "blue",
+                    "verification_checked_at": timezone.now(),
+                },
             )
             CampaignParticipation.objects.get_or_create(
                 campaign=campaign, seller=profile, defaults={"status": "ACTIVE"}

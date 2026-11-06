@@ -306,6 +306,13 @@ class DiscoveryRenewalTests(TestCase):
             provider_user_id="42",
             username="alice",
             status="CONNECTED",
+            # Only verified accounts are tracked (Spec 03), and the badge is
+            # recorded as freshly checked so `refresh_account_verification`
+            # answers from the stored value. These tests are about token
+            # rotation; making the poller call `get_account` here would test two
+            # things at once.
+            verified_type="blue",
+            verification_checked_at=timezone.now(),
         )
         store_credentials(self.account, access_token="old-access", refresh_token="old-refresh")
         self.posted_at = timezone.now() - timedelta(hours=1)

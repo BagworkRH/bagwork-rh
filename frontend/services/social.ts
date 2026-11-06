@@ -48,6 +48,11 @@ export function disconnectPlatform(
  */
 export function getConnections(): Promise<{
   connections: SocialAccount[];
+  /**
+   * The server's policy, so the UI can word the warning rather than hard-code a
+   * rule that is a setting. When false, an unverified account still earns.
+   */
+  verified_accounts_required: boolean;
   mock: boolean;
 }> {
   return apiRequest("/api/v1/x/connections/", { auth: true });

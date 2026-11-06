@@ -30,6 +30,30 @@ class SocialPlatform(models.TextChoices):
     YOUTUBE = "youtube", "YouTube"
 
 
+# The badges X reports through `verified_type`. `blue` is the paid X Premium
+# check; `business` and `government` are organisation badges.
+#
+# The legacy `verified` boolean is deliberately NOT used. It is not trustworthy:
+# X's own tooling shipped a bug (xurl v1.0.3, fixed in v1.2.0) where an account
+# with an active Premium subscription and a visible blue badge reported
+# `verified: false`, while `verified_type` in the same response said "blue". A
+# payout gate resting on that boolean would refuse to pay real creators.
+VERIFIED_BADGE_TYPES = frozenset({"blue", "business", "government"})
+
+
+def normalize_verified_type(raw) -> str:
+    """Reduce whatever the provider returned to a value we are willing to act on.
+
+    Fails closed. An absent field, an unexpected enum value, or a value X adds
+    later all collapse to "none" — because this gate decides whether a creator
+    can be paid, an unrecognised badge must not count as a badge. Same reasoning
+    as `referenced_tweets`: an unknown type is treated as amplification rather
+    than assumed original.
+    """
+    value = str(raw or "").strip().lower()
+    return value if value in VERIFIED_BADGE_TYPES else "none"
+
+
 class SocialAccount(models.Model):
     """A seller's linked account on one social platform.
 
@@ -56,6 +80,15 @@ class SocialAccount(models.Model):
     connected_at = models.DateTimeField(default=timezone.now)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=16, default="CONNECTED")
+    # X's verification badge, stored as `verified_type` reports it.
+    #
+    # Re-read from the provider rather than trusted forever: X Premium is a
+    # *subscription*, so an account verified when it was connected can stop
+    # being verified without anything in this system changing. Checking only at
+    # connect would let someone subscribe for one month, connect, cancel, and
+    # keep earning indefinitely. See `refresh_account_verification`.
+    verified_type = models.CharField(max_length=16, default="none")
+    verification_checked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-connected_at"]
@@ -69,6 +102,15 @@ class SocialAccount(models.Model):
                 name="social_account_one_per_platform_per_seller",
             ),
         ]
+
+    @property
+    def is_verified(self) -> bool:
+        """Whether this account carries a badge we honour.
+
+        Derived from `verified_type` rather than stored alongside it, so the
+        badge and the flag cannot drift apart.
+        """
+        return self.verified_type in VERIFIED_BADGE_TYPES
 
     def __str__(self):
         return f"@{self.username} on {self.get_platform_display()} ({self.provider_user_id})"

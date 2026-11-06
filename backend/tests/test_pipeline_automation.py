@@ -52,6 +52,10 @@ class PipelineAutomationTests(TestCase):
             provider_user_id="42",
             username="alice",
             status="CONNECTED",
+            # Only verified accounts are tracked (Spec 03). No
+            # `verification_checked_at`, so the badge is stale and the first poll
+            # re-reads it from the mocked provider below.
+            verified_type="blue",
         )
         store_credentials(self.account, access_token="tok", refresh_token="ref")
 
@@ -67,10 +71,16 @@ class PipelineAutomationTests(TestCase):
         if stub_queue:
             with (
                 mock.patch("apps.social.providers.get_provider", return_value=provider),
+                # The badge is re-read through the service's own registry
+                # binding, a separate import and so a separate patch target.
+                mock.patch("apps.social.services.get_provider", return_value=provider),
                 mock.patch("apps.social.tasks.run_verification_on_post"),
             ):
                 return self._run_task()
-        with mock.patch("apps.social.providers.get_provider", return_value=provider):
+        with (
+            mock.patch("apps.social.providers.get_provider", return_value=provider),
+            mock.patch("apps.social.services.get_provider", return_value=provider),
+        ):
             return self._run_task()
 
     def _run_task(self):

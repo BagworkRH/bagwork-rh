@@ -126,6 +126,11 @@ class DiscoveryPollerTests(TestCase):
             provider_user_id="42",
             username="alice",
             status="CONNECTED",
+            # Only verified accounts are tracked (Spec 03), so the fixture has to
+            # carry a badge for discovery to do anything at all. It is created
+            # with no `verification_checked_at`, which means the badge is stale
+            # and the poller re-reads it from the provider on the first tick.
+            verified_type="blue",
         )
         creds, iv = encrypt_secret('{"access_token": "test-token"}')
         self.account.encrypted_credentials = creds
@@ -157,6 +162,10 @@ class DiscoveryPollerTests(TestCase):
         # the correct patch target.
         with (
             patch("apps.social.providers.get_provider", return_value=provider),
+            # The badge is re-read through the *service's* registry binding,
+            # which is a separate import of `get_provider` and so a separate
+            # patch target from the one above.
+            patch("apps.social.services.get_provider", return_value=provider),
             # Discovery now queues verification of each new post. This class is
             # about discovery's own output, so the queue is stubbed rather than
             # left to reach for a broker a unit test does not have.

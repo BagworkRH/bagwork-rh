@@ -41,6 +41,13 @@ export default function OnboardPage() {
   const [sellerCode, setSellerCode] = useState<string>("");
   const [available, setAvailable] = useState<PlatformChoice[]>([]);
   const [linked, setLinked] = useState<SocialAccount[]>([]);
+  /**
+   * The server's rule: posts are only tracked for accounts carrying a
+   * verification badge. Kept as state rather than assumed, because it is a
+   * setting — if it is switched off, an unverified account earns normally and a
+   * warning here would be a lie.
+   */
+  const [verifiedRequired, setVerifiedRequired] = useState(false);
   const [platformBusy, setPlatformBusy] = useState<SocialPlatform | null>(null);
   const [platformError, setPlatformError] = useState<string | null>(null);
   /**
@@ -71,6 +78,7 @@ export default function OnboardPage() {
     try {
       const res = await getConnections();
       setLinked(res.connections);
+      setVerifiedRequired(Boolean(res.verified_accounts_required));
     } catch {
       setLinked([]);
     }
@@ -308,43 +316,59 @@ export default function OnboardPage() {
                   {available.map((platform) => {
                     const account = linked.find((a) => a.platform === platform.id);
                     const busy = platformBusy === platform.id;
+                    // Connected but unverifiable is the state that most needs
+                    // saying out loud: everything looks fine and nothing earns.
+                    const unpaid = Boolean(
+                      account && !account.is_verified && verifiedRequired
+                    );
                     return (
-                      // Identity on one line, action pushed to the right, so
-                      // "Connected" and the Disconnect button share a baseline
-                      // and stay in column from row to row instead of drifting
-                      // with the width of the handle.
-                      <div
-                        className="row"
-                        key={platform.id}
-                        style={{ justifyContent: "space-between" }}
-                      >
-                        <div className="row" style={{ marginTop: 0 }}>
-                          <strong>{platform.name}</strong>
+                      <div key={platform.id}>
+                        <div
+                          className="row"
+                          style={{ justifyContent: "space-between" }}
+                        >
+                          <div className="row" style={{ marginTop: 0 }}>
+                            <strong>{platform.name}</strong>
+                            {account ? (
+                              <>
+                                <span className="badge badge-ok">Connected</span>
+                                <span className="muted">@{account.username}</span>
+                                {account.is_verified ? (
+                                  <span className="badge badge-info">Verified</span>
+                                ) : (
+                                  <span className="badge badge-warn">Not verified</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="muted">Not connected</span>
+                            )}
+                          </div>
                           {account ? (
-                            <>
-                              <span className="badge badge-ok">Connected</span>
-                              <span className="muted">@{account.username}</span>
-                            </>
+                            <button
+                              className="btn btn-outline btn-sm"
+                              disabled={busy}
+                              onClick={() => void handleDisconnect(platform.id)}
+                            >
+                              {busy ? "Disconnecting…" : "Disconnect"}
+                            </button>
                           ) : (
-                            <span className="muted">Not connected</span>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={busy}
+                              onClick={() => void handleConnect(platform.id)}
+                            >
+                              {busy ? "Redirecting…" : "Connect"}
+                            </button>
                           )}
                         </div>
-                        {account ? (
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={busy}
-                            onClick={() => void handleDisconnect(platform.id)}
-                          >
-                            {busy ? "Disconnecting…" : "Disconnect"}
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            disabled={busy}
-                            onClick={() => void handleConnect(platform.id)}
-                          >
-                            {busy ? "Redirecting…" : "Connect"}
-                          </button>
+                        {unpaid && (
+                          <div className="banner banner-note" style={{ marginTop: 10 }}>
+                            <strong>This account is not verified.</strong> Posts are
+                            only tracked for verified accounts, so nothing from{" "}
+                            {platform.name} can earn yet. Verify the account on the
+                            platform and it starts working on its own — the badge is
+                            re-checked daily, and you do not need to reconnect.
+                          </div>
                         )}
                       </div>
                     );

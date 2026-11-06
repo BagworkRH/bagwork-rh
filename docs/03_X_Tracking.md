@@ -14,6 +14,50 @@ identity → match to one seller → encrypt credentials → store provider user
 username → mark connected. One X account should not link to multiple active
 sellers.
 
+## Verified accounts only
+A post is only tracked when its author carries a verification badge. Discovery
+reads the connected account's **own** timeline, so the author of every discovered
+post is that account — which is why this is one gate on the account rather than a
+check on each post.
+
+The badge is read from X's `verified_type` (`blue` · `business` · `government`),
+**not** the legacy `verified` boolean. That boolean reported `false` for Premium
+subscribers holding a visible blue badge (xurl issue #41, fixed in v1.2.0) while
+`verified_type` said `"blue"` in the same response, so a gate built on it would
+refuse to pay real creators. Anything unrecognised — an absent field, a value X
+adds later — counts as no badge: this decides whether someone is paid, so an
+unknown string cannot pass as a credential.
+
+Because X Premium is a **subscription**, a badge held at connect time can lapse
+with nothing on this side changing. A connect-time check alone is farmable:
+subscribe for one month, connect, cancel, keep earning. So the badge is re-read
+from the provider once a day (`VERIFICATION_TTL`), before the timeline call, and
+discovery acts on the stored value in between.
+
+Rules the implementation holds to:
+
+- **Fail closed, but never on an outage.** If the badge cannot be read, the poll
+  is skipped and the stored badge is left untouched. An unreachable X must not
+  strip a verified creator of their badge and stop their earnings — the same rule
+  that stops a post being marked VERIFIED while the provider is down.
+- **No request for an untrackable account.** The gate runs before the timeline
+  call, so an unverified account costs nothing and the campaign watermark is left
+  alone, because nothing was read.
+- **A change is audited.** `SOCIAL_VERIFICATION_CHANGED` records a badge
+  appearing or disappearing, because it changes whether someone can be paid.
+- **The creator is told.** An unverified account still connects and still shows
+  in the dashboard, marked, with the consequence spelled out. An account that
+  looks connected and silently earns nothing is the most confusing state this
+  product can present.
+
+`REQUIRE_VERIFIED_ACCOUNTS` (default `true`) switches the rule off and tracks
+every connected account.
+
+**What this rule is not.** The blue badge is a paid X Premium subscription, so
+requiring it excludes every creator who will not buy one — it is a supply filter,
+not a quality signal. It is also not a fraud control: spammers buy badges too.
+The anti-abuse signals below remain what actually catches farming.
+
 ## Seller code
 Cryptographically secure, non-sequential, e.g. `SELLER-7K4M2P`.
 Unique, case-normalized, difficult to guess, never reused, indexed.

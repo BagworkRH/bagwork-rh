@@ -55,7 +55,17 @@ class SocialProvider(ABC):
 
     @abstractmethod
     def get_account(self, access_token):
-        """Fetch the authenticated account identity."""
+        """Fetch the authenticated account identity.
+
+        Returns a dict including `verified_type`: the account's verification
+        badge, as the platform reports it (`blue`, `business` or `government`;
+        anything else counts as no badge — see
+        `apps.social.models.normalize_verified_type`).
+
+        Do not substitute a legacy boolean for it. X's older `verified` field
+        misreports Premium subscribers as unverified, and this value decides
+        whether a creator's posts may be tracked and paid at all.
+        """
         raise NotImplementedError
 
     @abstractmethod

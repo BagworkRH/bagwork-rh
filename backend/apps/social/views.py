@@ -21,7 +21,11 @@ from rest_framework.response import Response
 from .models import SocialOAuthState, SocialPlatform
 from .providers import available_platforms, get_provider, is_mock
 from .providers.base import SocialProviderError
-from .services import disconnect_social_account, link_social_account
+from .services import (
+    disconnect_social_account,
+    link_social_account,
+    verified_accounts_required,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,9 +241,18 @@ def connections(request):
                     "last_synced_at": a.last_synced_at.isoformat()
                     if a.last_synced_at
                     else None,
+                    # Whether this account's posts can be tracked at all. The
+                    # dashboard shows the account either way and explains the
+                    # consequence, rather than hiding it behind silence and
+                    # leaving the creator to wonder why nothing was counted.
+                    "verified_type": a.verified_type,
+                    "is_verified": a.is_verified,
                 }
                 for a in accounts
             ],
+            # The rule itself, so the UI can word the warning without hard-coding
+            # a policy that is a setting.
+            "verified_accounts_required": verified_accounts_required(),
             # Mirror `platforms/` so a client can tell mock from real in one call.
             "mock": is_mock(),
         }

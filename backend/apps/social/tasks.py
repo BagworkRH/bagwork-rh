@@ -158,6 +158,45 @@ def run_verification_on_post(self, post_id):
     return {"status": result.verification_status, "post": post_id}
 
 
+def _verification_refusal(account):
+    """Why this account's posts must not be tracked — or None to carry on.
+
+    Returns the payload the poller should return, so that the rule reads as one
+    decision instead of as three more `return`s inside the poller.
+
+    Only accounts carrying a verification badge are tracked (Spec 03), and this
+    is asked *before* the timeline call rather than after, for two reasons: an
+    account that cannot be tracked then costs no provider request at all, and the
+    campaign watermark is left untouched because nothing was actually read.
+    """
+    from .providers.base import (  # noqa: PLC0415
+        SocialProviderAuthError,
+        SocialProviderError,
+    )
+    from .services import (  # noqa: PLC0415
+        refresh_account_verification,
+        verified_accounts_required,
+    )
+
+    if not verified_accounts_required():
+        return None
+
+    try:
+        authorized = refresh_account_verification(account)
+    except SocialProviderAuthError as exc:
+        return {"status": "reauth-required", "created": 0, "detail": str(exc)[:200]}
+    except SocialProviderError as exc:
+        # The badge could not be established — the account may well be verified
+        # and X is simply unreachable. Skipping is the fail-closed direction, and
+        # the next tick asks again. Guessing "verified" here would be exactly the
+        # arbitrary default this gate exists to prevent.
+        return {"status": "provider-error", "created": 0, "detail": str(exc)[:200]}
+
+    if not authorized:
+        return {"status": "not-verified", "created": 0}
+    return None
+
+
 @shared_task
 def discover_posts_for_account(account_id, campaign_id):
     """Poll one connected account for new posts in one campaign, idempotently.
@@ -187,6 +226,10 @@ def discover_posts_for_account(account_id, campaign_id):
     if not account.encrypted_credentials:
         return {"status": "no-credentials", "created": 0}
 
+    refusal = _verification_refusal(account)
+    if refusal is not None:
+        return refusal
+
     since = campaign.discovery_watermark(account.platform)
     now = timezone.now()
 
@@ -198,14 +241,24 @@ def discover_posts_for_account(account_id, campaign_id):
                 token, account.provider_user_id, campaign, since, now
             ),
         )
-    except SocialProviderAuthError as exc:
-        # The token is dead and could not be renewed. The account is now
-        # REAUTH_REQUIRED, so later ticks skip it instead of re-asking X.
-        return {"status": "reauth-required", "created": 0, "detail": str(exc)[:200]}
     except SocialProviderError as exc:
-        # Do NOT advance the watermark on failure: the posts we missed must be
-        # re-read next tick, or a transient outage silently loses real posts.
-        return {"status": "provider-error", "created": 0, "detail": str(exc)[:200]}
+        # One handler for two failures, because they differ only in the status
+        # they report. A rejected refresh token means the creator must reconnect
+        # — `SocialProviderAuthError` is a subclass, so it is identified
+        # explicitly rather than by the order of the handlers. Anything else is
+        # the provider having a problem, which resolves itself.
+        #
+        # Neither advances the watermark: the posts we missed must be re-read
+        # next tick, or a transient outage silently loses real posts.
+        return {
+            "status": (
+                "reauth-required"
+                if isinstance(exc, SocialProviderAuthError)
+                else "provider-error"
+            ),
+            "created": 0,
+            "detail": str(exc)[:200],
+        }
 
     created = 0
     for payload in found:

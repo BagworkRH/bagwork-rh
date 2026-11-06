@@ -20,12 +20,16 @@ class MockSocialProvider(SocialProvider):
 
     is_mock = True
 
-    def __init__(self, user, platform="x", discovered_posts=None):
+    def __init__(self, user, platform="x", discovered_posts=None, verified_type="blue"):
         self._user = user
         self.platform = platform
         # Discovery is exercised in tests, so the mock needs something to
         # return. Defaults to empty, which is the honest "nothing new".
         self._discovered = list(discovered_posts or [])
+        # Defaults to a verified creator, so the ordinary discovery path is the
+        # one the suite exercises and the unverified path has to be asked for.
+        # Set "none" to model an account with no badge.
+        self._verified_type = verified_type
 
     def _suffix(self):
         # Distinct per platform so mock ids do not collide across platforms.
@@ -48,6 +52,7 @@ class MockSocialProvider(SocialProvider):
             "username": self._user.username or "mockuser",
             "display_name": self._user.username or "Mock User",
             "avatar_url": "",
+            "verified_type": self._verified_type,
             "scopes": ["read", "user_info"],
         }
 
@@ -56,6 +61,7 @@ class MockSocialProvider(SocialProvider):
             "provider_user_id": f"mock-{self._suffix()}-{self._user.id}",
             "username": self._user.username or "mockuser",
             "display_name": self._user.username or "Mock User",
+            "verified_type": self._verified_type,
         }
 
     def get_post(self, access_token, post_id):
