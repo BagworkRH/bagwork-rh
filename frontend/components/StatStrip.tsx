@@ -2,20 +2,30 @@
 
 import { useState } from "react";
 
+import { CompassIcon, CoinsIcon, TrophyIcon, UsersIcon } from "@/components/icons";
 import TopGainersRail from "@/components/TopGainersRail";
 import type { LeaderboardEntry } from "@/types";
+
+const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
+  CoinsIcon,
+  TrophyIcon,
+  UsersIcon,
+  CompassIcon,
+};
 
 type StatCard = {
   label: string;
   value: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: string;
 };
 
 /**
  * Platform headline stats with a toggle to swap in the Top Gainer rail.
  *
  * Kept as a client component so the show/stats toggle can use state without
- * pulling the whole async landing page into the client boundary.
+ * pulling the whole async landing page into the client boundary. Icons are
+ * passed as string names (not component functions) because functions cannot be
+ * serialized across the server/client boundary.
  */
 export default function StatStrip({
   cards,
@@ -50,7 +60,7 @@ export default function StatStrip({
         <TopGainersRail entries={entries} />
       ) : cards.length > 0 ? (
         cards.map((card) => {
-          const Icon = card.icon;
+          const Icon = ICONS[card.icon];
           return (
             <div
               className="stat-box"

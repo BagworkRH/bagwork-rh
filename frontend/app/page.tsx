@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import ArenaBoard from "@/components/ArenaBoard";
 import StatStrip from "@/components/StatStrip";
-import { ArrowRightIcon, CompassIcon, CoinsIcon, TrophyIcon, UsersIcon } from "@/components/icons";
+import { ArrowRightIcon } from "@/components/icons";
 import { ProgressBar } from "@/components/ui";
 import { apiRequest } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
@@ -58,10 +58,10 @@ export default async function HomePage() {
   const live = campaigns.filter((campaign) => campaign.status === "ACTIVE");
   const cards = stats
     ? [
-        { label: "Rewards paid", value: compact(stats.rewards_paid_total), icon: CoinsIcon },
-        { label: "Claims settled", value: stats.claims_completed.toLocaleString("en-US"), icon: TrophyIcon },
-        { label: "Active creators", value: stats.active_sellers.toLocaleString("en-US"), icon: UsersIcon },
-        { label: "Campaigns live", value: stats.campaigns_live.toLocaleString("en-US"), icon: CompassIcon },
+        { label: "Rewards paid", value: compact(stats.rewards_paid_total), icon: "CoinsIcon" },
+        { label: "Claims settled", value: stats.claims_completed.toLocaleString("en-US"), icon: "TrophyIcon" },
+        { label: "Active creators", value: stats.active_sellers.toLocaleString("en-US"), icon: "UsersIcon" },
+        { label: "Campaigns live", value: stats.campaigns_live.toLocaleString("en-US"), icon: "CompassIcon" },
       ]
     : [];
 
